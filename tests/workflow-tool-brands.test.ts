@@ -10,7 +10,9 @@ describe('workflow tool brands', () => {
     seedDatabase(db);
     const tools = new Set(db.workflows.all().flatMap((w) => w.steps.flatMap((s) => s.tools)));
     db.close();
-    expect(tools.size).toBeGreaterThanOrEqual(10);
+    // ILS's 4 real workflows are agent/human handoffs, not a rich per-step
+    // SaaS stack like Alex's — most steps honestly carry no tool at all.
+    expect(tools.size).toBeGreaterThanOrEqual(1);
     for (const t of tools) {
       expect(TOOL_BRANDS[t], `workflow tool '${t}' is missing an explicit brand entry`).toBeDefined();
       const b = toolBrand(t);

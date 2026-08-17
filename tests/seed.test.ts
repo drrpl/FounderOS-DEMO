@@ -14,7 +14,10 @@ describe('seedDatabase', () => {
     seedDatabase(db);
     expect(db.departments.all().length).toBeGreaterThanOrEqual(5);
     expect(db.agents.all().length).toBeGreaterThanOrEqual(5);
-    expect(db.tools.all().length).toBeGreaterThanOrEqual(8);
+    // ILS's real tech stack is a solo coaching business's, not Alex's 20+
+    // connector agency stack — 7 honest entries, not padded to hit a bigger
+    // number (INV-1: a short honest list beats a fabricated long one).
+    expect(db.tools.all().length).toBeGreaterThanOrEqual(5);
     expect(db.roadmap.all().length).toBeGreaterThanOrEqual(10);
     expect(db.metrics.all().length).toBeGreaterThanOrEqual(4);
     expect(db.domains.all().length).toBeGreaterThanOrEqual(8);

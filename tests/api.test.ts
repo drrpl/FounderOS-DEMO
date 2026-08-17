@@ -37,7 +37,8 @@ describe('API route handlers', () => {
     const { GET } = await import('@/app/api/tools/route');
     const res = await GET();
     const body = await res.json();
-    expect(body.tools.length).toBeGreaterThanOrEqual(8);
+    // ILS's real tech stack is short and honest (7 entries), not Alex's 20+.
+    expect(body.tools.length).toBeGreaterThanOrEqual(5);
   });
 
   test('POST /api/agents/[id]/run executes a real agent and persists the run', async () => {

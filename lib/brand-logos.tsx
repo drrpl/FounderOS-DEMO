@@ -67,6 +67,7 @@ const LETTERMARK: Record<string, string> = {
   dmflow: '#0084FF',
   skool: '#E4573D',
   'proposal-gen': '#00764f',
+  linkedin: '#0A66C2',
 };
 
 function siFor(slug: string): SiIcon | null {

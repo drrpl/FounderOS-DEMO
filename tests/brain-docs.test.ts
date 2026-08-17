@@ -40,7 +40,7 @@ describe('buildBrainDocs', () => {
     expect(docs.filter((x) => x.path.startsWith('org/pillar-')).length).toBe(d.departments.all().length);
     expect(paths.has('agents/linkedin.md')).toBe(true);
     expect(paths.has('sops/sop-linkedin.md')).toBe(true);
-    expect(paths.has('tools/ledger.md')).toBe(true);
+    expect(paths.has('tools/linkedin.md')).toBe(true);
     // ILS is solo (company.yaml: team.structure "solo") — no people seeded.
     expect(d.people.all()).toEqual([]);
     expect(paths.has('org/pillar-marketing-brand.md')).toBe(true);
@@ -76,7 +76,7 @@ describe('buildBrainDocs', () => {
     const docs = docsFor(seeded());
     // ILS agents' tools[] are Claude Code tool names (Read/Write/...), not the
     // business-tool slugs in this catalog — none is wired to a connector yet.
-    const ledger = docs.find((x) => x.path === 'tools/ledger.md')!.content;
+    const ledger = docs.find((x) => x.path === 'tools/linkedin.md')!.content;
     expect(ledger).toContain('Nobody is wired to this tool yet.');
   });
 

@@ -17,6 +17,7 @@ export const TOOL_BRANDS: Record<string, ToolBrand> = {
   calendar: { slug: 'googlecalendar', name: 'Google Calendar' },
   ghl: { slug: 'gohighlevel', name: 'GoHighLevel' },
   gmail: { slug: 'gmail', name: 'Gmail' },
+  linkedin: { slug: 'linkedin', name: 'LinkedIn' },
   dmflow: { slug: 'dmflow', name: 'DMFlow' },
   notion: { slug: 'notion', name: 'Notion' },
   'proposal-gen': { slug: 'proposal-gen', name: 'Proposal Generator' },

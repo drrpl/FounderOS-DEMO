@@ -104,26 +104,19 @@ describe('mapAttioDeals', () => {
 });
 
 describe('classifyVenture', () => {
-  test('person-name deals read as Launchpad Cohort mentorship leads', () => {
-    expect(classifyVenture('Reese Calder')).toBe('launchpad-cohort');
-    expect(classifyVenture('Tayla Nguyen')).toBe('launchpad-cohort');
-    expect(classifyVenture('CASEY EXAMPLE')).toBe('launchpad-cohort');
+  test('every deal reads as the single real venture, regardless of name shape', () => {
+    expect(classifyVenture('Reese Calder')).toBe('ils');
+    expect(classifyVenture('Orbit Labs')).toBe('ils');
+    expect(classifyVenture('Fields Roofing LLC')).toBe('ils');
   });
 
-  test('company-flavored deals read as Vantage client builds', () => {
-    expect(classifyVenture('Orbit Labs')).toBe('vantage');
-    expect(classifyVenture('Harbor Dental')).toBe('vantage');
-    expect(classifyVenture('Lin & Co Accounting')).toBe('vantage');
-    expect(classifyVenture('Fields Roofing LLC')).toBe('vantage');
-  });
-
-  test('mapAttioDeals stamps the heuristic venture on every journey', () => {
+  test('mapAttioDeals stamps the single venture on every journey', () => {
     const { journeys } = mapAttioDeals([
       rawDeal({ id: 'rec-p', name: 'Reese Calder', stage: 'Contacted' }),
       rawDeal({ id: 'rec-c', name: 'Orbit Labs', stage: 'Contacted' }),
     ], NOW);
-    expect(journeys.find((j) => j.id === 'attio-rec-p')?.venture).toBe('launchpad-cohort');
-    expect(journeys.find((j) => j.id === 'attio-rec-c')?.venture).toBe('vantage');
+    expect(journeys.find((j) => j.id === 'attio-rec-p')?.venture).toBe('ils');
+    expect(journeys.find((j) => j.id === 'attio-rec-c')?.venture).toBe('ils');
   });
 });
 

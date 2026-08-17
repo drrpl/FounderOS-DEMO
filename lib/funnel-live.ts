@@ -66,16 +66,12 @@ export const ATTIO_STAGE_MAP: Record<string, FunnelStage> = {
 };
 
 /**
- * Venture heuristic for live deals (they carry no venture attribute yet):
- * company-flavored names read as Vantage client builds, bare person names as
- * Launchpad Cohort mentorship leads. Legible and wrong-at-the-edges by
- * design — add a venture attribute in Attio for the exact split.
+ * Single real venture (ILS) — every live deal belongs to it. Kept as a
+ * function (not an inline literal at the call site) so a second venture is a
+ * one-line change here rather than a hunt through every caller.
  */
-const COMPANY_HINTS =
-  /\b(llc|inc|ltd|co|corp|company|solutions?|group|agency|tech|labs?|media|studio|consult\w*|clinic|dental|legal|law|realty|roofing|fitness|accounting|capital|ventures?|partners?|systems?|services?)\b|&/i;
-
-export function classifyVenture(dealName: string): 'vantage' | 'launchpad-cohort' {
-  return COMPANY_HINTS.test(dealName) ? 'vantage' : 'launchpad-cohort';
+export function classifyVenture(_dealName: string): 'ils' {
+  return 'ils';
 }
 
 /**

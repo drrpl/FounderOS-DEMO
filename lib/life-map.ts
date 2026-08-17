@@ -1,6 +1,6 @@
 /**
- * Alex's life map: the radial taxonomy at the heart of the OS.
- * Center = Alex's life; ring 1 = color-coded life areas; ring 2 = the
+ * ILS's life map: the radial taxonomy at the heart of the OS.
+ * Center = Ramesh's life; ring 1 = color-coded life areas; ring 2 = the
  * modules inside each area. Communication additionally carries the contact
  * tier system — the numbered/colored response-priority ladder for people.
  *
@@ -29,54 +29,51 @@ export const LIFE_AREAS: LifeArea[] = [
     color: '#f59e0b',
     detail: 'Everything that earns attention.',
     modules: [
-      { id: 'content', label: 'Content', detail: 'Posts, scripts, and creative across IG/TikTok/YT/X.' },
-      { id: 'email', label: 'Email', detail: 'Campaigns and sequences.' },
-      { id: 'newsletter', label: 'Newsletter', detail: 'The recurring owned-audience send.' },
-      { id: 'sms', label: 'SMS', detail: 'Text blasts and reminders.' },
-      { id: 'editing', label: 'Editing', detail: 'Cuts, captions, and post-production.' },
+      { id: 'content', label: 'Content', detail: 'LinkedIn posts and thought leadership — the primary organic channel.' },
+      { id: 'email', label: 'Email', detail: 'Landing-page and email copy for the funnel.' },
+      { id: 'newsletter', label: 'Newsletter', detail: 'Planned ongoing send — not yet running.' },
+      { id: 'video', label: 'Video', detail: 'YouTube and speaking engagements — planned, not yet a cadence.' },
+      { id: 'campaigns', label: 'Campaigns', detail: 'Timed pushes around the complimentary session or the LEVERAGE course.' },
     ],
-    agents: ['social-agent', 'postly-publisher', 'adsmith-creative', 'reelkit-editor', 'renderly-creative', 'dmflow-mcp', 'social-pulse'],
+    agents: [
+      'marketing-director',
+      'brand-positioning',
+      'content-strategy',
+      'linkedin',
+      'copywriting',
+      'campaign-management',
+      'lead-nurture',
+      'marketing-analytics',
+    ],
     brainFolders: ['media', 'writing', 'ideas'],
-    departmentIds: ['dept-marketing-growth'],
+    departmentIds: ['dept-marketing-brand'],
   },
   {
     id: 'sales',
     label: 'Sales',
     color: '#ef4444',
-    detail: 'Deals, pipeline, and revenue relationships.',
+    detail: 'The complimentary-session pipeline and the coaching close.',
     modules: [
-      { id: 'pipeline', label: 'Pipeline', detail: 'Active deals and stages.' },
-      { id: 'crm', label: 'CRM', detail: 'People, companies, and account history.' },
-      { id: 'follow-up', label: 'Follow-up', detail: 'Next actions and reminders.' },
-      { id: 'offers', label: 'Offers', detail: 'Proposals, pricing, and close paths.' },
+      { id: 'pipeline', label: 'Pipeline', detail: 'Where prospects sit across the funnel — blocked on the CRM workflow audit.' },
+      { id: 'qualification', label: 'Qualification', detail: 'Screening inbound interest against the 6 real qualification criteria.' },
+      { id: 'follow-up', label: 'Follow-up', detail: 'Outstanding proposals and post-session interest.' },
+      { id: 'proposals', label: 'Proposals', detail: 'Scope, cadence, and investment for 1:1 coaching.' },
     ],
-    agents: [
-      'sales-agent',
-      'crm-pulse',
-      'launchpad-cohort-sales',
-      'vantage-sales',
-      'paykit-sales',
-      'vantage-paykit',
-      'stripe-sales',
-      'processor-confirmation',
-      'flexpay-financing',
-      'sales-calls-data',
-    ],
-    brainFolders: ['people', 'companies', 'hiring'],
-    departmentIds: ['dept-sales'],
+    agents: ['lead-qualification', 'discovery-preparation', 'proposal', 'sales-follow-up', 'pipeline'],
+    brainFolders: ['people', 'companies'],
+    departmentIds: ['dept-sales-bd'],
   },
   {
     id: 'finances',
     label: 'Finances',
     color: '#22c55e',
-    detail: 'Money in, money out, every processor.',
+    detail: 'Pricing is real; unit economics and billing are not yet tracked.',
     modules: [
-      { id: 'payments', label: 'Payments', detail: 'Stripe + the processor registry.' },
-      { id: 'invoicing', label: 'Invoicing', detail: 'What is owed and by whom.' },
-      { id: 'subscriptions', label: 'Subscriptions', detail: 'Recurring revenue and churn.' },
-      { id: 'bookkeeping', label: 'Bookkeeping', detail: 'Categorized, reconciled, tax-ready.' },
+      { id: 'pricing', label: 'Pricing', detail: 'Course + coaching pricing — the one real number.' },
+      { id: 'unit-economics', label: 'Unit economics', detail: 'LTV:CAC and gross margin — not tracked yet.' },
+      { id: 'billing', label: 'Billing', detail: 'The actual billing system isn’t even confirmed yet.' },
     ],
-    agents: ['payments-pulse'],
+    agents: ['financial-analysis', 'revenue-forecasting', 'billing-review'],
     brainFolders: ['companies'],
     departmentIds: ['dept-finance'],
   },
@@ -84,68 +81,83 @@ export const LIFE_AREAS: LifeArea[] = [
     id: 'communication',
     label: 'Communication',
     color: '#3b82f6',
-    detail: 'Every person, every channel, one priority ladder.',
+    detail: 'Every person, one priority ladder — no unified inbox exists yet at ILS.',
     modules: [
       {
         id: 'client-management',
         label: 'Client management',
         detail: 'Tagged people with response tiers — who needs an answer ASAP.',
       },
-      { id: 'inbox', label: 'Inbox', detail: '4 IMAP inboxes, unified.' },
-      { id: 'whatsapp', label: 'WhatsApp', detail: 'Conversations from local ChatStorage.' },
-      { id: 'slack', label: 'Slack', detail: 'Workspace messages and mentions.' },
-      { id: 'meetings', label: 'Meetings', detail: 'Notes and follow-ups.' },
+      { id: 'inbox', label: 'Inbox', detail: 'No unified inbox yet — email is handled directly.' },
+      { id: 'meetings', label: 'Meetings', detail: 'Coaching session notes and follow-ups.' },
     ],
-    agents: ['comms-agent', 'gmail-worker', 'whatsapp-worker', 'slack-worker'],
+    // No dedicated comms department or unified-inbox agent exists yet — left
+    // honestly unstaffed rather than forcing a fit onto an agent whose real
+    // job is something else.
+    agents: [],
     brainFolders: ['inbox', 'meetings', 'people'],
-    departmentIds: ['dept-comms'],
+    departmentIds: [],
   },
   {
     id: 'clients',
     label: 'Clients',
     color: '#14b8a6',
-    detail: 'Every client, onboarded and served.',
+    detail: 'Every client and course member, onboarded and served.',
     modules: [
-      { id: 'roster', label: 'Roster', detail: 'Who is a client right now, by venture.' },
-      { id: 'onboarding', label: 'Onboarding', detail: 'Closed-won to kickoff without a dropped step.' },
-      { id: 'service', label: 'Service', detail: 'Check-in cadence and deliverable tracking.' },
-      { id: 'renewals', label: 'Renewals', detail: 'Expansion and renewal timing.' },
+      { id: 'onboarding', label: 'Onboarding', detail: 'Designed for new course members and coaching clients — none exists today.' },
+      { id: 'coaching', label: 'Coaching', detail: 'Session prep, recaps, and the accountability rhythm.' },
+      { id: 'curriculum', label: 'Curriculum', detail: 'The LEVERAGE Framework’s 10 modules, Locate through Expand.' },
+      { id: 'health', label: 'Client health', detail: 'Retention risk — reported honestly as "not enough data" today.' },
     ],
-    agents: ['client-roster', 'client-onboarding', 'client-success'],
+    // Programs & Curriculum is placed here rather than under Knowledge: a
+    // member's module progression is part of their client journey, not
+    // ILS's own research/knowledge base.
+    agents: [
+      'client-onboarding',
+      'coaching-preparation',
+      'session-follow-up',
+      'accountability',
+      'client-health',
+      'curriculum',
+      'leverage-framework',
+      'assessment',
+      'learning-materials',
+    ],
     brainFolders: ['people', 'companies'],
-    departmentIds: ['dept-clients'],
+    departmentIds: ['dept-client-success', 'dept-programs-curriculum'],
   },
   {
     id: 'knowledge',
     label: 'Knowledge',
     color: '#a855f7',
-    detail: 'G-Brain: markdown, vectors, and recall.',
+    detail: 'Company, market, and competitive research, plus the DBA research pool.',
     modules: [
-      { id: 'brain-store', label: 'Brain store', detail: 'Markdown source of truth on disk.' },
-      { id: 'vector-db', label: 'Vector DB', detail: 'Chunks → embeddings → pgvector.' },
-      { id: 'prompts', label: 'Prompts', detail: 'Reusable prompt library.' },
-      { id: 'sources', label: 'Sources', detail: 'Reference material and citations.' },
+      { id: 'company-research', label: 'Company research', detail: 'Per-prospect research ahead of a complimentary session.' },
+      { id: 'market-intel', label: 'Market intelligence', detail: 'How the ICP talks about scaling and leadership — the market_research_brief gap.' },
+      { id: 'dba-pool', label: 'DBA research', detail: 'Citable concepts from Ramesh’s dissertation, sourced per INV-8.' },
+      { id: 'knowledge-mgmt', label: 'Knowledge management', detail: 'The reference/ folder as a pointer into the shared research pool.' },
     ],
-    agents: ['data-agent', 'markdown-auditor', 'vector-auditor', 'notion-sync', 'brain-librarian'],
+    agents: ['company-research', 'market-intelligence', 'competitive-intelligence', 'strategic-research', 'knowledge-management'],
     brainFolders: ['concepts', 'prompts', 'sources', 'archive'],
-    departmentIds: ['dept-tech'],
+    // dept-tech-ai rolls up to knowledge first (lifeAreaForDepartment takes
+    // the first match, and knowledge is listed before operations below);
+    // operations still owns its own agents from that department directly.
+    departmentIds: ['dept-research-bi', 'dept-tech-ai'],
   },
   {
     id: 'operations',
     label: 'Operations',
     color: '#fafafa',
-    detail: 'The machine that runs the machine.',
+    detail: 'SOPs, the CRM workflow catalog, and quality control.',
     modules: [
-      { id: 'agents', label: 'Agents', detail: 'The roster and its hierarchy.' },
-      { id: 'automations', label: 'Automations', detail: 'Scheduled and self-healing jobs.' },
-      { id: 'infra', label: 'Infra', detail: 'Local stack, ports, dedicated host target.' },
-      { id: 'hiring', label: 'Hiring', detail: 'Candidates and roles.' },
+      { id: 'sops', label: 'SOPs', detail: 'ILS’s real, already-running CRM processes, documented from observed patterns.' },
+      { id: 'workflows', label: 'Workflows', detail: 'The live catalog of 18 Coach Foundation CRM automations.' },
+      { id: 'quality', label: 'Quality control', detail: 'Spot-checks against INV-1, INV-2, and INV-3.' },
+      { id: 'automation', label: 'Automation', detail: 'Technical build side of ILS’s CRM automations, once the audit is complete.' },
     ],
-    // dept-tech rolls up to knowledge first (lifeAreaForDepartment takes the
-    // first match); operations still owns the conductor + stack agents.
-    agents: ['conductor', 'stack-monitor'],
-    brainFolders: ['org', 'projects', 'hiring'],
-    departmentIds: ['dept-tech'],
+    agents: ['operations-manager', 'sop', 'workflow', 'quality-control', 'automation', 'crm'],
+    brainFolders: ['org', 'projects'],
+    departmentIds: ['dept-operations', 'dept-tech-ai'],
   },
 ];
 
@@ -158,7 +170,7 @@ export type ContactTier = {
 };
 
 /**
- * The response-priority ladder for people Alex talks to.
+ * The response-priority ladder for people Ramesh talks to.
  * 1 = red (clients & students), 2 = yellow (brand), 3 = green (personal).
  * Specific people get overrides via the contact_tags table.
  */
@@ -177,7 +189,7 @@ export function buildLifeMap(): LifeMap {
     {
       id: 'center',
       type: 'center',
-      label: "Alex's Life",
+      label: "Ramesh's Life",
       color: '#fafafa',
       parent: null,
       detail: 'The core. Everything orbits this.',

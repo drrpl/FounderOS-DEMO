@@ -30,7 +30,7 @@ afterEach(() => {
 const contact = (over: Partial<FunnelContact> = {}): FunnelContact => ({
   id: 'fc-test',
   name: 'Test Client',
-  venture: 'vantage',
+  venture: 'ils',
   status: 'engaged',
   product: null,
   amountUsd: null,
@@ -94,81 +94,30 @@ describe('funnel repo', () => {
     expect(j.linkedin).toBe('https://linkedin.com/in/gracelin-example');
   });
 
-  test('venture filter narrows journeys', () => {
+  test('venture filter passes through the one real venture without crashing', () => {
     db = openDb(':memory:');
-    db.funnel.insertContact(contact({ id: 'fc-m', venture: 'vantage' }));
-    db.funnel.insertContact(contact({ id: 'fc-aa', venture: 'launchpad-cohort' }));
-    expect(db.funnel.journeys('vantage').map((j) => j.id)).toEqual(['fc-m']);
-    expect(db.funnel.journeys('launchpad-cohort').map((j) => j.id)).toEqual(['fc-aa']);
+    db.funnel.insertContact(contact({ id: 'fc-m', venture: 'ils' }));
+    db.funnel.insertContact(contact({ id: 'fc-aa', venture: 'ils' }));
+    expect(db.funnel.journeys('ils').map((j) => j.id).sort()).toEqual(['fc-aa', 'fc-m']);
     expect(db.funnel.journeys()).toHaveLength(2);
   });
 });
 
 describe('funnel seed', () => {
-  test('seeds 4–5 touch journeys for both ventures, converted rows carry product + amount', () => {
+  test('seeds honestly empty — no real CRM/funnel data is tracked for ILS yet (INV-1)', () => {
     db = openDb(':memory:');
     seedDatabase(db);
     const all = db.funnel.journeys();
-    expect(all.length).toBeGreaterThanOrEqual(10);
+    // The demo shipped this table with fabricated dummy clients (Jake Moreau,
+    // Ava Stone, etc.) and invented deal amounts. ILS's company.yaml confirms
+    // no funnel/CRM data exists yet, so the honest seed is empty — a blank
+    // beats a fabrication (INV-1). funnel-live.ts/funnel-ghl.ts stay wired
+    // for when a real Attio/GHL source lands.
+    expect(all).toEqual([]);
 
-    for (const j of all) {
-      FunnelJourneySchema.parse(j);
-      expect(j.touches.length).toBeGreaterThanOrEqual(4);
-      expect(j.touches.length).toBeLessThanOrEqual(5);
-      // touches are a contiguous 1..n sequence in chronological order
-      expect(j.touches.map((t) => t.seq)).toEqual(j.touches.map((_, i) => i + 1));
-      expect(j.touches[0].stage).toBe('first_touch');
-    }
-
-    // both ventures represented
-    expect(new Set(all.map((j) => j.venture))).toEqual(new Set(['vantage', 'launchpad-cohort']));
-
-    // both acquisition lanes represented, with honest intended sources
-    const firsts = all.map((j) => j.touches[0]);
-    expect(firsts.some((t) => t.channel === 'organic' && t.source === 'trakyo')).toBe(true);
-    expect(firsts.some((t) => t.channel === 'ads' && t.source === 'meta-ads')).toBe(true);
-
-    // converted journeys end on a converted touch and carry the offer + amount
-    const converted = all.filter((j) => j.status === 'converted');
-    expect(converted.length).toBeGreaterThanOrEqual(4);
-    for (const j of converted) {
-      expect(j.touches.at(-1)?.stage).toBe('converted');
-      expect(j.product).toBeTruthy();
-      expect(j.amountUsd ?? 0).toBeGreaterThan(0);
-    }
-
-    // some journeys are honestly mid-funnel (not everyone converts)
-    expect(all.some((j) => j.status !== 'converted')).toBe(true);
-
-    // one seeded lead has decayed past 90 quiet days so the archive tab demos
-    const split = splitFunnelJourneys(all, new Date());
-    expect(split.archived.length).toBeGreaterThanOrEqual(1);
-    expect(split.active.length).toBeGreaterThanOrEqual(10);
-
-    // and one active lead sits mid-fade so the decay rendering always demos
-    const decays = funnelSpaceModel(split.active, new Date()).map((n) => n.decay);
-    expect(decays.some((d) => d > 0.3 && d < 1)).toBe(true);
-
-    // relationship + likelihood seeded for every client
-    for (const j of all) {
-      expect(['cold', 'warm', 'hot']).toContain(j.relationship);
-      expect(j.likelihood).toBeGreaterThanOrEqual(0);
-      expect(j.likelihood).toBeLessThanOrEqual(100);
-    }
-
-    // touch dates are relative to today, so stall states stay meaningful:
-    // at least one non-converted lead is stalled (>7d quiet) and one is active
-    const now = new Date();
-    const metas = all.filter((j) => j.status !== 'converted').map((j) => journeyMeta(j, now));
-    expect(metas.some((m) => m.state === 'stalled')).toBe(true);
-    expect(metas.some((m) => m.state === 'active')).toBe(true);
-    // and the freshest touch is genuinely recent (not a fixed 2026-06 date)
-    const freshest = Math.min(...metas.map((m) => m.daysSinceLastTouch));
-    expect(freshest).toBeLessThanOrEqual(3);
-
-    // re-seeding is idempotent
+    // re-seeding stays idempotent over the empty set
     seedDatabase(db);
-    expect(db.funnel.journeys()).toHaveLength(all.length);
+    expect(db.funnel.journeys()).toHaveLength(0);
   });
 });
 
@@ -181,7 +130,7 @@ describe('funnelSummary', () => {
   ): FunnelJourney => ({
     id,
     name: id,
-    venture: 'vantage',
+    venture: 'ils',
     status,
     product: amountUsd ? 'Offer' : null,
     amountUsd,
@@ -253,7 +202,7 @@ describe('journeyMeta', () => {
   ): FunnelJourney => ({
     id: 'jm',
     name: 'jm',
-    venture: 'vantage',
+    venture: 'ils',
     status,
     product: null,
     amountUsd: null,
@@ -361,7 +310,7 @@ describe('funnelSpaceModel', () => {
   ): FunnelJourney => ({
     id,
     name: id,
-    venture: 'launchpad-cohort',
+    venture: 'ils',
     status,
     product: null,
     amountUsd: null,
@@ -456,7 +405,7 @@ describe('attentionQueue — what to act on today (AC55)', () => {
   ): FunnelJourney => ({
     id,
     name: id,
-    venture: 'vantage',
+    venture: 'ils',
     status: 'engaged',
     product: null,
     amountUsd: null,

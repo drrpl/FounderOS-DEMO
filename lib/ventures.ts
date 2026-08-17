@@ -1,14 +1,13 @@
 /**
- * Alex's two active income sources — the venture lens over the OS.
+ * ILS's one venture — the venture lens over the OS.
  *
  * One database, one G-Brain, one agent roster: ventures never partition the
  * data. They are saved filters — each one names the agents that serve it per
  * life area, the brain tag that marks its pages, and the current executive
- * focus. Switching venture in the hierarchy or life map swaps which crew
- * lights up; the agents themselves keep full visibility of everything.
- *
- * Personal Brand (brand-deals) was retired from this lens — the OS focuses on
- * Vantage (the agency) and Launchpad Cohort (the mentorship).
+ * focus. FounderOS-DEMO originally shipped two ventures (Alex's Vantage
+ * agency + Launchpad Cohort); ILS is a solo operation with exactly one real
+ * venture, so this is a single-entry array, not a placeholder for a second
+ * one.
  */
 import type { LifeArea } from '@/lib/life-map';
 import { LIFE_AREAS } from '@/lib/life-map';
@@ -21,58 +20,54 @@ export type Venture = {
   detail: string;
   /** Tag that marks this venture's pages inside the single shared G-Brain. */
   brainTag: string;
-  /** Current executive priorities — edit freely, this is Alex's list. */
+  /** Current executive priorities — real punch-list items, not invented. */
   focus: string[];
   /** life-area id → the agents working that area FOR this venture. */
   areaAgents: Record<string, string[]>;
 };
 
-const SHARED_OPS = ['conductor', 'stack-monitor'];
-const SHARED_KNOWLEDGE = ['data-agent', 'markdown-auditor', 'vector-auditor'];
-
 export const VENTURES: Venture[] = [
   {
-    id: 'vantage',
-    label: 'Vantage',
-    kind: 'AI agency',
-    // Brand green sampled from the Vantage logo.
-    color: '#00ffaa',
-    detail: 'Client AI builds and delivery — the agency arm.',
-    brainTag: 'vantage',
+    id: 'ils',
+    label: 'Innovative Leadership Strategies',
+    kind: 'Coaching & courses',
+    // LinkedIn blue — ILS's primary organic channel today (traffic_acquisition
+    // .organic_strategies in company.yaml). Distinct from every life-area color.
+    color: '#0A66C2',
+    detail: 'The LEVERAGE Framework — a 10-module membership course ($197) with 1:1 executive coaching ($5,000–$10,000/mo) as the implementation upsell.',
+    brainTag: 'ils',
     focus: [
-      'Active client builds shipped on schedule',
-      'Pipeline: proposals out, deals advanced in Ledger',
-      'Delivery quality — every handoff documented in G-Brain',
+      'Finish the Coach Foundation CRM workflow audit — 8+ of 18 workflows captured so far',
+      'Author the next real skill (/editorial-calendar-build or /campaign-brief-builder) — only 2 of 43 agents have one today',
+      'Close the real company.yaml gaps: LTV:CAC and gross margin untracked, no proven headlines/hooks, no funnel conversion data yet',
     ],
     areaAgents: {
-      marketing: ['social-agent', 'postly-publisher', 'reelkit-editor', 'renderly-creative'],
-      sales: ['vantage-sales', 'vantage-paykit', 'sales-agent', 'sales-calls-data'],
-      communication: ['comms-agent', 'gmail-worker', 'slack-worker', 'crm-pulse'],
-      finances: ['payments-pulse', 'stripe-sales', 'processor-confirmation'],
-      knowledge: [...SHARED_KNOWLEDGE, 'notion-sync'],
-      operations: SHARED_OPS,
-    },
-  },
-  {
-    id: 'launchpad-cohort',
-    label: 'Launchpad Cohort',
-    kind: 'Mentorship program',
-    // Brand crimson — hsl(355 70% 50%) from the live LC site theme + brand guide.
-    color: '#d9263f',
-    detail: 'The mentorship — students, curriculum, community.',
-    brainTag: 'launchpad-cohort',
-    focus: [
-      'Student results — track wins, unblock stuck students fast',
-      'Content + newsletter cadence for enrollment',
-      'Community pulse on WhatsApp; T1 response times hold',
-    ],
-    areaAgents: {
-      marketing: ['social-agent', 'adsmith-creative', 'postly-publisher', 'dmflow-mcp', 'reelkit-editor'],
-      sales: ['launchpad-cohort-sales', 'paykit-sales', 'sales-agent', 'sales-calls-data'],
-      communication: ['whatsapp-worker', 'gmail-worker', 'comms-agent', 'crm-pulse'],
-      finances: ['payments-pulse', 'stripe-sales', 'flexpay-financing', 'processor-confirmation'],
-      knowledge: SHARED_KNOWLEDGE,
-      operations: SHARED_OPS,
+      // Content, brand, and campaign work — Marketing & Brand department.
+      marketing: [
+        'marketing-director',
+        'brand-positioning',
+        'content-strategy',
+        'linkedin',
+        'copywriting',
+        'campaign-management',
+        'lead-nurture',
+        'marketing-analytics',
+      ],
+      // Lead-to-client pipeline — Sales & Business Development department.
+      sales: ['lead-qualification', 'discovery-preparation', 'proposal', 'sales-follow-up', 'pipeline'],
+      // Pricing is real; unit economics and billing are not yet tracked — Finance department.
+      finances: ['financial-analysis', 'revenue-forecasting', 'billing-review'],
+      // No unified inbox or dedicated comms department exists at ILS yet
+      // (matches lib/life-map.ts's own honest-empty call on this same area) —
+      // left unstaffed rather than force-fitting Client Success agents whose
+      // real job isn't inbox/WhatsApp/Slack triage.
+      communication: [],
+      // Client Success & Coaching, plus Programs & Curriculum (the course itself).
+      clients: ['client-onboarding', 'coaching-preparation', 'client-health', 'curriculum', 'leverage-framework'],
+      // Research & Business Intelligence, plus Knowledge Management (Technology & AI).
+      knowledge: ['company-research', 'market-intelligence', 'competitive-intelligence', 'strategic-research', 'knowledge-management'],
+      // Operations, plus the rest of Technology & AI Systems.
+      operations: ['chief-of-staff', 'operations-manager', 'sop', 'workflow', 'quality-control', 'ai-systems-architect', 'automation', 'crm'],
     },
   },
 ];
@@ -92,7 +87,7 @@ export function venturesForAgent(agentId: string): Venture[] {
   return VENTURES.filter((v) => ventureAgentSet(v.id).has(agentId));
 }
 
-/** Agents on one life area for one venture (the click-through Alex described). */
+/** Agents on one life area for one venture. */
 export function ventureAreaAgents(ventureId: string, areaId: string): string[] {
   return getVenture(ventureId)?.areaAgents[areaId] ?? [];
 }

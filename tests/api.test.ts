@@ -158,30 +158,30 @@ describe('API route handlers', () => {
     expect(res.status).toBe(400);
   });
 
-  test('GET /api/funnel returns a validated summary + journeys', async () => {
+  test('GET /api/funnel returns a validated, honestly-empty summary + journeys (no real pipeline seeded yet)', async () => {
     const { GET } = await import('@/app/api/funnel/route');
     const res = await GET(new Request('http://localhost/api/funnel'));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.summary.clients).toBeGreaterThanOrEqual(10);
+    // ILS has no real CRM pipeline data seeded (INV-1 truth gate — a blank
+    // beats a fabrication) — the seeded funnel is honestly empty until a
+    // real Attio/GHL/CRM source is wired.
+    expect(body.summary.clients).toBe(0);
     expect(body.summary.stages.map((s: { stage: string }) => s.stage)).toEqual([
       'first_touch', 'engaged', 'nurtured', 'opted_in', 'converted',
     ]);
-    expect(body.journeys.length).toBe(body.summary.clients);
-    expect(body.journeys[0].touches.length).toBeGreaterThanOrEqual(4);
-    // leads quiet past 90 days decay out of journeys into the archive
+    expect(body.journeys.length).toBe(0);
     expect(Array.isArray(body.archived)).toBe(true);
-    expect(body.archived.length).toBeGreaterThanOrEqual(1);
-    expect(body.journeys.map((j: { id: string }) => j.id)).not.toContain(body.archived[0].id);
+    expect(body.archived.length).toBe(0);
   });
 
-  test('GET /api/funnel?venture= filters journeys to one venture', async () => {
+  test('GET /api/funnel?venture= filters journeys to the one real venture', async () => {
     const { GET } = await import('@/app/api/funnel/route');
-    const res = await GET(new Request('http://localhost/api/funnel?venture=vantage'));
+    const res = await GET(new Request('http://localhost/api/funnel?venture=ils'));
     expect(res.status).toBe(200);
     const body = await res.json();
-    expect(body.journeys.length).toBeGreaterThan(0);
-    expect(body.journeys.every((j: { venture: string }) => j.venture === 'vantage')).toBe(true);
+    // honestly empty (no seeded pipeline), but the filter itself must not crash
+    expect(body.journeys.every((j: { venture: string }) => j.venture === 'ils')).toBe(true);
   });
 
   test('GET /api/funnel rejects an unknown venture', async () => {

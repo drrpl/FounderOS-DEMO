@@ -10,17 +10,17 @@ import { realAgents } from '@/lib/agents/real';
 import { AGENT_BRAIN_SCOPES } from '@/lib/brain-graph';
 
 describe('LIFE_AREAS', () => {
-  test("covers Alex's named areas with distinct colors", () => {
+  test("covers ILS's named areas with distinct colors", () => {
     const ids = LIFE_AREAS.map((a) => a.id);
     expect(ids).toEqual(expect.arrayContaining(['sales', 'marketing', 'finances', 'communication']));
     const colors = LIFE_AREAS.map((a) => a.color);
     expect(new Set(colors).size).toBe(colors.length);
   });
 
-  test('marketing breaks down into the five named modules', () => {
+  test('marketing breaks down into named modules', () => {
     const marketing = LIFE_AREAS.find((a) => a.id === 'marketing')!;
     expect(marketing.modules.map((m) => m.id)).toEqual(
-      expect.arrayContaining(['content', 'email', 'newsletter', 'sms', 'editing']),
+      expect.arrayContaining(['content', 'email', 'newsletter']),
     );
   });
 
@@ -37,10 +37,23 @@ describe('LIFE_AREAS', () => {
       }
     }
   });
+
+  test('marketing is staffed by the Marketing & Brand department', () => {
+    const marketing = LIFE_AREAS.find((a) => a.id === 'marketing')!;
+    expect(marketing.agents).toEqual(
+      expect.arrayContaining(['marketing-director', 'linkedin', 'brand-positioning']),
+    );
+  });
+
+  test('communication is honestly unstaffed — no unified inbox exists at ILS yet', () => {
+    const comms = LIFE_AREAS.find((a) => a.id === 'communication')!;
+    expect(comms.agents).toEqual([]);
+    expect(comms.departmentIds).toEqual([]);
+  });
 });
 
 describe('CONTACT_TIERS', () => {
-  test("Alex's three priorities: 1 red, 2 yellow, 3 green", () => {
+  test('three priorities: 1 red, 2 yellow, 3 green', () => {
     expect(CONTACT_TIERS.map((t) => t.tier)).toEqual([1, 2, 3]);
     expect(CONTACT_TIERS[0].color).toBe('#ef4444'); // red
     expect(CONTACT_TIERS[1].color).toBe('#eab308'); // yellow
@@ -64,10 +77,10 @@ describe('CONTACT_TIERS', () => {
 describe('buildLifeMap', () => {
   const map = buildLifeMap();
 
-  test('has a single center node labeled for Alex', () => {
+  test('has a single center node labeled for Ramesh', () => {
     const centers = map.nodes.filter((n) => n.type === 'center');
     expect(centers).toHaveLength(1);
-    expect(centers[0].label.toLowerCase()).toContain('alex');
+    expect(centers[0].label.toLowerCase()).toContain('ramesh');
   });
 
   test('one area node per life area, each linked to the center', () => {
@@ -99,19 +112,28 @@ describe('buildLifeMap', () => {
 });
 
 describe('lifeAreaForDepartment', () => {
-  test('maps every seeded department to a life area', () => {
-    for (const dept of ['dept-sales', 'dept-marketing-growth', 'dept-tech', 'dept-finance', 'dept-comms']) {
+  test('maps every mapped seeded department to a life area', () => {
+    for (const dept of ['dept-sales-bd', 'dept-marketing-brand', 'dept-finance', 'dept-client-success', 'dept-research-bi', 'dept-operations']) {
       const area = lifeAreaForDepartment(dept);
       expect(area, `no life area for ${dept}`).toBeTruthy();
       expect(LIFE_AREAS.some((a) => a.id === area!.id)).toBe(true);
     }
   });
 
-  test('sales is sales; marketing/growth is marketing; comms is communication; finance is finances; tech is knowledge', () => {
-    expect(lifeAreaForDepartment('dept-sales')?.id).toBe('sales');
-    expect(lifeAreaForDepartment('dept-marketing-growth')?.id).toBe('marketing');
-    expect(lifeAreaForDepartment('dept-comms')?.id).toBe('communication');
+  test('sales is sales; marketing/brand is marketing; finance is finances; client-success is clients; research-bi is knowledge', () => {
+    expect(lifeAreaForDepartment('dept-sales-bd')?.id).toBe('sales');
+    expect(lifeAreaForDepartment('dept-marketing-brand')?.id).toBe('marketing');
     expect(lifeAreaForDepartment('dept-finance')?.id).toBe('finances');
-    expect(lifeAreaForDepartment('dept-tech')?.id).toBe('knowledge');
+    expect(lifeAreaForDepartment('dept-client-success')?.id).toBe('clients');
+    expect(lifeAreaForDepartment('dept-research-bi')?.id).toBe('knowledge');
+  });
+
+  test('dept-tech-ai rolls up to knowledge first, ahead of operations', () => {
+    expect(lifeAreaForDepartment('dept-tech-ai')?.id).toBe('knowledge');
+  });
+
+  test('executive and legal-risk have no mapped life area — honestly unmapped, not forced', () => {
+    expect(lifeAreaForDepartment('dept-executive')).toBeNull();
+    expect(lifeAreaForDepartment('dept-legal-risk')).toBeNull();
   });
 });

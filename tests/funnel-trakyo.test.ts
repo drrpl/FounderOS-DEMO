@@ -5,7 +5,7 @@ import type { FunnelJourney } from '@/lib/schemas';
 const journey = (id: string, name: string): FunnelJourney => ({
   id,
   name,
-  venture: 'launchpad-cohort',
+  venture: 'ils',
   status: 'engaged',
   product: null,
   amountUsd: null,

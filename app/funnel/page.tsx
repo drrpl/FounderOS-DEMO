@@ -39,8 +39,7 @@ export const dynamic = 'force-dynamic';
 
 const VENTURE_TABS: { id: FunnelVenture | 'all'; label: string }[] = [
   { id: 'all', label: 'All clients' },
-  { id: 'vantage', label: 'Vantage' },
-  { id: 'launchpad-cohort', label: 'Launchpad Cohort' },
+  { id: 'ils', label: 'ILS' },
 ];
 
 function usd(amount: number): string {

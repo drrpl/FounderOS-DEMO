@@ -211,7 +211,7 @@ describe('seeded social data', () => {
     const byPlatform = new Map(db.social.accounts().map((a) => [a.platform, a]));
     expect(byPlatform.get('instagram')?.handle).toBe('@founderos.ai');
     expect(byPlatform.get('twitter')?.handle).toBe('@Founderosai');
-    expect(byPlatform.get('linkedin')?.handle).toBe('Alex Rivera');
+    expect(byPlatform.get('linkedin')?.handle).toBe('Ramesh Prasad');
   });
 
   test('seeds multi-month history ending at the seeded current value', () => {

@@ -5,7 +5,7 @@ import type { Agent } from '@/lib/schemas';
  * agent (`social-agent`) and its Postly publisher + creative workers live. The
  * lead comes first, then the workers alphabetically.
  */
-export const CONTENT_DEPT_ID = 'dept-marketing-growth';
+export const CONTENT_DEPT_ID = 'dept-marketing-brand';
 
 export function contentAgents(agents: Agent[]): Agent[] {
   const isLead = (a: Agent) => (a.tier === 'lead' || a.parentId === null ? 0 : 1);

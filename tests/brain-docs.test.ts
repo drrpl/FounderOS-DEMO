@@ -38,11 +38,12 @@ describe('buildBrainDocs', () => {
     expect(docs.filter((x) => x.path.startsWith('tools/')).length).toBe(d.tools.all().length);
     expect(docs.filter((x) => x.path.startsWith('people/')).length).toBe(d.people.all().length);
     expect(docs.filter((x) => x.path.startsWith('org/pillar-')).length).toBe(d.departments.all().length);
-    expect(paths.has('agents/gmail-worker.md')).toBe(true);
-    expect(paths.has('sops/sop-gmail-worker.md')).toBe(true);
-    expect(paths.has('tools/imap.md')).toBe(true);
-    expect(paths.has('people/person-marco.md')).toBe(true);
-    expect(paths.has('org/pillar-clients.md')).toBe(true);
+    expect(paths.has('agents/linkedin.md')).toBe(true);
+    expect(paths.has('sops/sop-linkedin.md')).toBe(true);
+    expect(paths.has('tools/ledger.md')).toBe(true);
+    // ILS is solo (company.yaml: team.structure "solo") — no people seeded.
+    expect(d.people.all()).toEqual([]);
+    expect(paths.has('org/pillar-marketing-brand.md')).toBe(true);
   });
 
   test('every doc carries the generated marker in frontmatter', () => {
@@ -52,38 +53,40 @@ describe('buildBrainDocs', () => {
 
   test('an agent doc holds its charter, SOP instructions and wikilinked tools', () => {
     const docs = docsFor(seeded());
-    const gmail = docs.find((x) => x.path === 'agents/gmail-worker.md')!.content;
-    expect(gmail).toContain('IMAP Inboxes');
-    expect(gmail).toContain('Triage the four Gmail inboxes');
-    expect(gmail).toContain('Classify each thread');
-    expect(gmail).toContain('[[imap]]');
-    expect(gmail).toContain('[[comms-agent]]'); // reports to
-    expect(gmail).toContain('[[pillar-communications]]');
+    const linkedin = docs.find((x) => x.path === 'agents/linkedin.md')!.content;
+    expect(linkedin).toContain('primary organic acquisition channel');
+    expect(linkedin).toContain('Take the brief from Content Strategy');
+    expect(linkedin).toContain('[[sop-linkedin]]');
+    expect(linkedin).toContain('[[Read]]'); // Claude Code tool, wikilinked
+    expect(linkedin).toContain('[[marketing-director]]'); // reports to
+    expect(linkedin).toContain('[[pillar-marketing-brand]]');
   });
 
   test('a SOP doc is built out: purpose, owner, trigger, steps, done, escalation', () => {
     const docs = docsFor(seeded());
-    const sop = docs.find((x) => x.path === 'sops/sop-client-onboarding.md')!.content;
+    const sop = docs.find((x) => x.path === 'sops/sop-linkedin.md')!.content;
     for (const section of ['## Purpose', '## Owner', '## Trigger', '## Steps', '## Definition of done', '## Escalation']) {
       expect(sop, `missing ${section}`).toContain(section);
     }
-    expect(sop).toContain('closed-won');
-    expect(sop).toContain('[[client-onboarding]]');
+    expect(sop).toContain('complimentary coaching session');
+    expect(sop).toContain('[[linkedin]]');
   });
 
-  test('a tool doc lists who uses it, wikilinked', () => {
+  test('a tool doc honestly reports no users when no ILS agent is wired to it yet', () => {
     const docs = docsFor(seeded());
+    // ILS agents' tools[] are Claude Code tool names (Read/Write/...), not the
+    // business-tool slugs in this catalog — none is wired to a connector yet.
     const ledger = docs.find((x) => x.path === 'tools/ledger.md')!.content;
-    expect(ledger).toContain('[[sales-agent]]');
-    expect(ledger).toContain('[[person-marco]]');
+    expect(ledger).toContain('Nobody is wired to this tool yet.');
   });
 
   test('a pillar doc rosters its workers and SOPs', () => {
     const docs = docsFor(seeded());
-    const clients = docs.find((x) => x.path === 'org/pillar-clients.md')!.content;
-    expect(clients).toContain('[[client-roster]]');
-    expect(clients).toContain('[[person-rae]]');
-    expect(clients).toContain('[[sop-client-onboarding]]');
+    const marketing = docs.find((x) => x.path === 'org/pillar-marketing-brand.md')!.content;
+    expect(marketing).toContain('[[linkedin]]');
+    expect(marketing).toContain('[[brand-positioning]]');
+    expect(marketing).toContain('[[sop-linkedin]]');
+    expect(marketing).toContain('[[sop-brand-positioning]]');
   });
 
   test('deterministic output', () => {
@@ -99,10 +102,10 @@ describe('writeBrainDocs', () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'brain-docs-'));
     const first = writeBrainDocs(docs, dir);
     expect(first.written).toBeGreaterThan(0);
-    expect(existsSync(path.join(dir, 'agents', 'gmail-worker.md'))).toBe(true);
+    expect(existsSync(path.join(dir, 'agents', 'linkedin.md'))).toBe(true);
 
     // hand-edited (non-generated) file must be left alone
-    const handmade = path.join(dir, 'agents', 'gmail-worker.md');
+    const handmade = path.join(dir, 'agents', 'linkedin.md');
     writeFileSync(handmade, '# my own notes, no marker');
     const second = writeBrainDocs(docs, dir);
     expect(readFileSync(handmade, 'utf8')).toBe('# my own notes, no marker');

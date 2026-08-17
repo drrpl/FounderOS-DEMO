@@ -76,10 +76,13 @@ describe('people + sopTasks repos', () => {
 describe('seeded SOP graph data', () => {
   test('seeding is idempotent for people and tasks', () => {
     const d = seeded();
+    // ILS is solo (company.yaml: team.structure "solo") — honestly zero
+    // people seeded, not a bug. Only the 2 agents with a real documented
+    // process (linkedin, brand-positioning) get a seeded SOP task.
     const people = d.people.all().length;
     const tasks = d.sopTasks.all().length;
-    expect(people).toBeGreaterThan(0);
-    expect(tasks).toBeGreaterThan(0);
+    expect(people).toBe(0);
+    expect(tasks).toBe(2);
     seedDatabase(d);
     expect(d.people.all().length).toBe(people);
     expect(d.sopTasks.all().length).toBe(tasks);
@@ -106,10 +109,16 @@ describe('seeded SOP graph data', () => {
     }
   });
 
-  test('every agent has exactly one task', () => {
+  test('only the agents with a real documented process have a seeded task (no fabricated SOPs)', () => {
     const d = seeded();
     const assigned = d.sopTasks.all().filter((t) => t.assigneeKind === 'agent').map((t) => t.assigneeId);
-    expect(assigned.sort()).toEqual(d.agents.all().map((a) => a.id).sort());
+    // Per agents/README.md: exactly 2 of ILS's 43 agents have a real authored
+    // skill/process today. The other 41 are judgment-complete personas with
+    // no built automation yet — giving them a written SOP would fabricate a
+    // process that doesn't exist.
+    expect(assigned.sort()).toEqual(['brand-positioning', 'linkedin']);
+    const knownAgentIds = new Set(d.agents.all().map((a) => a.id));
+    for (const id of assigned) expect(knownAgentIds.has(id)).toBe(true);
   });
 
   test('every person has exactly one task and at least one tool', () => {

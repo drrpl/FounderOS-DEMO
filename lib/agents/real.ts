@@ -1,531 +1,349 @@
-import { z } from 'zod';
-import { getBrainProvider } from '@/lib/brain';
-import { createGBrainProvider } from '@/lib/connectors/gbrain';
-import { parseInboxConfigs, unreadCounts } from '@/lib/connectors/email';
-import { configuredProcessors, stripeSnapshot } from '@/lib/connectors/payments';
-import { recentMessages } from '@/lib/connectors/slack';
-import { recentPages } from '@/lib/connectors/notion';
-import { zernioStatus } from '@/lib/connectors/zernio';
-import { attioClients, attioStatus } from '@/lib/connectors/attio';
-import { webinarjamStatus, listRegistrants } from '@/lib/connectors/webinarjam';
-import { trakyoStatus } from '@/lib/connectors/trakyo';
-import { arcadsStatus } from '@/lib/connectors/arcads';
-import { whatsappStatus } from '@/lib/connectors/whatsapp';
-import { wisprStatus } from '@/lib/connectors/wispr';
-import { localStackStatus } from '@/lib/connectors/local-stack';
-import { getDb } from '@/lib/data';
-import type { LlmToolSpec } from '@/lib/connectors/llm';
 import type { AgentRunResult, RuntimeAgent } from '@/lib/agents/runtime';
 
 /**
- * The real agent roster. Every run() does actual work against a live system —
- * no seeded numbers. Agents whose connector lacks credentials fail honestly
- * with setup instructions instead of pretending.
- *
- * Top-level agents are instance slots: when the dedicated host is live each one
- * becomes its own Clawline / Claude Code process and respond() routes
- * to that instance instead of the builtin implementation.
+ * The real agent roster for the ILS (Innovative Leadership Strategies) fork
+ * of FOUNDER OS. Every seeded agent (lib/seed.ts) maps 1:1 to an entry here
+ * (enforced by tests/seed.test.ts's "no larp" check) — but per ILS's own
+ * agents/README.md, only 2 of the 43 agents have a real skill built
+ * (`linkedin`, `brand-positioning`). Everything else is a judgment-complete
+ * persona with no automation yet, so its run() honestly reports "planned,"
+ * not a fabricated live status. No server-side LLM/API calls are made here —
+ * the 2 real skills live in Claude Code and are invoked there directly.
  */
 
-async function gmailRun(): Promise<AgentRunResult> {
-  const inboxes = parseInboxConfigs(process.env);
-  if (inboxes.length === 0) {
-    return { ok: false, summary: 'No inboxes configured — set INBOX_1..4_HOST/_USER/_PASS in .env.local' };
-  }
-  const counts = await unreadCounts(process.env);
-  const failed = counts.filter((c) => c.error);
-  const total = counts.reduce((sum, c) => sum + c.unread, 0);
-  return {
-    ok: failed.length < counts.length,
-    summary: counts
-      .map((c) => `${c.inbox}: ${c.error ? `ERROR ${c.error.slice(0, 60)}` : `${c.unread} unread`}`)
-      .join(' · ')
-      .concat(` · total ${total} unread`),
-    data: counts,
-  };
-}
+const skillRun =
+  (skillCommand: string, detail: string) =>
+  async (): Promise<AgentRunResult> => ({
+    ok: false,
+    summary: `Not runnable from this app — the real skill lives in Claude Code. Run \`${skillCommand}\` there. ${detail}`,
+  });
 
-async function whatsappRun(): Promise<AgentRunResult> {
-  const status = await whatsappStatus();
-  return { ok: status.state === 'connected', summary: status.detail, data: status.meta };
-}
-
-async function slackRun(): Promise<AgentRunResult> {
-  if (!process.env.SLACK_BOT_TOKEN) {
-    return { ok: false, summary: 'Slack not configured — set SLACK_BOT_TOKEN in .env.local' };
-  }
-  const messages = await recentMessages(10);
-  return {
-    ok: true,
-    summary: `${messages.length} recent messages across ${new Set(messages.map((m) => m.channel)).size} channels`,
-    data: messages,
-  };
-}
-
-async function zernioRun(): Promise<AgentRunResult> {
-  const status = await zernioStatus();
-  return { ok: status.state === 'connected', summary: status.detail, data: status.meta };
-}
-
-async function arcadsRun(): Promise<AgentRunResult> {
-  const status = await arcadsStatus();
-  return { ok: status.state === 'connected', summary: status.detail, data: status.meta };
-}
-
-const label = (r: AgentRunResult) => (r.ok ? 'LIVE' : 'DOWN');
-
-const envIntegrationRun =
-  (name: string, envKey: string, purpose: string) =>
-  async (): Promise<AgentRunResult> => {
-    if (!process.env[envKey]) {
-      return { ok: false, summary: `${name} not configured — set ${envKey} · ${purpose}` };
-    }
-    return { ok: true, summary: `${name} credential present · ${purpose}` };
-  };
-
-const plannedLaneRun =
-  (name: string, detail: string) =>
-  async (): Promise<AgentRunResult> => ({ ok: false, summary: `${name} lane planned — ${detail}` });
-
-async function stripeSalesRun(): Promise<AgentRunResult> {
-  if (!process.env.STRIPE_SECRET_KEY) {
-    return { ok: false, summary: 'Stripe sales checks not configured — set STRIPE_SECRET_KEY in .env.local' };
-  }
-  const snapshot = await stripeSnapshot(process.env);
-  return {
-    ok: true,
-    summary: `Stripe sales payments: ${snapshot.recentCharges.length} recent charges available for confirmation`,
-    data: snapshot,
-  };
-}
-
-async function processorConfirmationRun(): Promise<AgentRunResult> {
-  const configured = configuredProcessors(process.env).filter((p) => p.configured);
-  if (configured.length === 0) {
-    return { ok: false, summary: 'No payment processor APIs configured yet — start with STRIPE_SECRET_KEY' };
-  }
-  return {
-    ok: true,
-    summary: `${configured.map((p) => p.name).join(', ')} configured for payment confirmation`,
-    data: configured,
-  };
-}
+const plannedRun =
+  (detail: string) =>
+  async (): Promise<AgentRunResult> => ({
+    ok: false,
+    summary: `Planned — no automation built yet. ${detail}`,
+  });
 
 export const realAgents: RuntimeAgent[] = [
-  // ── Command ──────────────────────────────────────────────────────────
+  // ── 01 Executive Office ────────────────────────────────────────────────
   {
-    id: 'conductor',
-    name: 'Conductor',
-    description: 'Broadcast fan-out + instance host availability (Clawline gateway, Ollama, tmux) for future bindings.',
-    departmentId: 'dept-tech',
-    async run() {
-      const stack = await localStackStatus();
-      return {
-        ok: stack.state === 'connected',
-        summary: `Instance hosts on this machine: ${stack.detail} · all agents bound to builtin runtime until the dedicated host lands`,
-        data: stack.meta,
-      };
-    },
+    id: 'chief-of-staff',
+    name: 'Chief of Staff',
+    description: "Top of ILS's agent chain: routes escalations to Ramesh and tracks MRR as the one number that matters.",
+    departmentId: 'dept-executive',
+    run: plannedRun('Would synthesize department status and route escalations once departments report to it in a live system.'),
+  },
+  {
+    id: 'executive-briefing',
+    name: 'Executive Briefing',
+    description: 'Synthesizes workspace state and every department’s punch list into a two-minute status brief for Ramesh.',
+    departmentId: 'dept-executive',
+    run: plannedRun('Would compile a dated one-page brief from workspace/STATE.md and each department’s self-reported status.'),
+  },
+  {
+    id: 'strategy',
+    name: 'Strategy',
+    description: 'Holds ILS’s whole-business strategic judgment against its philosophy and contrarian beliefs.',
+    departmentId: 'dept-executive',
+    run: plannedRun('Would check new initiatives against creator_identity_matrix.philosophy and flag unvalidated-economics dependencies.'),
   },
 
-  // ── Comms instance + channel workers ─────────────────────────────────
+  // ── 02 Sales & Business Development ───────────────────────────────────
   {
-    id: 'comms-agent',
-    name: 'Comms Agent',
-    description: 'Aggregates the Gmail/WhatsApp/Slack workers that feed the unified /comms view.',
-    departmentId: 'dept-comms',
-    async run() {
-      const [gmail, whatsapp, slack] = await Promise.all([gmailRun(), whatsappRun(), slackRun()]);
-      const live = [gmail, whatsapp, slack].filter((r) => r.ok).length;
-      return {
-        ok: live > 0,
-        summary: `${live}/3 channels live → /comms · Gmail ${label(gmail)} · WhatsApp ${label(whatsapp)} · Slack ${label(slack)}`,
-        data: { gmail, whatsapp, slack },
-      };
-    },
-  },
-  { id: 'gmail-worker', name: 'Gmail Worker', description: 'Unread counts and recent mail from up to four IMAP inboxes.', departmentId: 'dept-comms', run: gmailRun },
-  { id: 'whatsapp-worker', name: 'WhatsApp Worker', description: 'Local WhatsApp ChatStorage, read-only.', departmentId: 'dept-comms', run: whatsappRun },
-  { id: 'slack-worker', name: 'Slack Worker', description: 'Latest messages across joined Slack channels.', departmentId: 'dept-comms', run: slackRun },
-
-  // ── Studio instance + content workers ────────────────────────────────
-  {
-    id: 'social-agent',
-    name: 'Social Agent',
-    description: 'Aggregates the Postly publishing and Adsmith ad-generation workers.',
-    departmentId: 'dept-marketing-growth',
-    async run() {
-      const [postly, adsmith] = await Promise.all([zernioRun(), arcadsRun()]);
-      const live = [postly, adsmith].filter((r) => r.ok).length;
-      const queued = getDb().socialPosts.queued().length;
-      const queueNote = queued > 0 ? `${queued} post${queued === 1 ? '' : 's'} queued for publish` : 'no posts queued';
-      return {
-        ok: live > 0,
-        summary: `${live}/2 core content APIs live · Postly ${label(postly)} · Adsmith ${label(adsmith)} · ${queueNote}`,
-        data: { postly, adsmith, queuedPosts: queued },
-      };
-    },
-  },
-  { id: 'postly-publisher', name: 'Postly Publisher', description: 'Six platforms under @founderos.ai via Postly.', departmentId: 'dept-marketing-growth', run: zernioRun },
-  { id: 'adsmith-creative', name: 'Adsmith Creative', description: 'UGC ads for Vantage via the Adsmith API.', departmentId: 'dept-marketing-growth', run: arcadsRun },
-  {
-    id: 'reelkit-editor',
-    name: 'Reelkit Editor',
-    description: 'Editing and rendering pipeline for social clips, captions, and promotional cuts.',
-    departmentId: 'dept-marketing-growth',
-    async run() {
-      const stack = await localStackStatus();
-      return {
-        ok: stack.state === 'connected',
-        summary: `Reelkit/social editing lane mapped · local stack: ${stack.detail}`,
-        data: stack.meta,
-      };
-    },
+    id: 'discovery-preparation',
+    name: 'Discovery Preparation',
+    description: 'Preps Ramesh for the complimentary coaching session with pain points and objections in advance.',
+    departmentId: 'dept-sales-bd',
+    run: plannedRun('Would produce a pre-call brief mapping the prospect to documented pain points and objections.'),
   },
   {
-    id: 'renderly-creative',
-    name: 'Renderly Creative',
-    description: 'Renderly creative generation for campaign visuals and product assets.',
-    departmentId: 'dept-marketing-growth',
-    async run() {
-      const stack = await localStackStatus();
-      return {
-        ok: stack.state === 'connected',
-        summary: `Renderly creative lane mapped · local stack: ${stack.detail}`,
-        data: stack.meta,
-      };
-    },
+    id: 'lead-qualification',
+    name: 'Lead Qualification',
+    description: 'Screens inbound interest against ILS’s 6 real qualification criteria before a session is booked.',
+    departmentId: 'dept-sales-bd',
+    run: plannedRun('Would check each of the 6 qualification criteria and route qualified/not-ready leads accordingly.'),
   },
   {
-    id: 'dmflow-mcp',
-    name: 'DMFlow MCP',
-    description: 'DMFlow MCP/API lane for social DM automations and lead capture.',
-    departmentId: 'dept-marketing-growth',
-    run: envIntegrationRun('DMFlow', 'MANYCHAT_API_KEY', 'DM automation and lead capture'),
+    id: 'pipeline',
+    name: 'Pipeline',
+    description: 'Tracks where prospects sit across the funnel — blocked on the in-progress CRM workflow audit.',
+    departmentId: 'dept-sales-bd',
+    run: plannedRun('Blocked until workspace/coach-foundation-workflows-audit.md is complete — no pipeline-stage structure exists yet.'),
+  },
+  {
+    id: 'proposal',
+    name: 'Proposal',
+    description: 'Writes the post-session proposal: scope, coaching cadence, and investment.',
+    departmentId: 'dept-sales-bd',
+    run: plannedRun('Would draft a written proposal from a specific complimentary-session diagnosis — no template exists yet.'),
+  },
+  {
+    id: 'sales-follow-up',
+    name: 'Sales Follow-Up',
+    description: 'Follows up on outstanding proposals and post-session interest without manufactured urgency.',
+    departmentId: 'dept-sales-bd',
+    run: plannedRun('Would check proposal status and follow up with substance, deferring to any existing CRM automation first.'),
   },
 
-  // ── Sales instance + pipeline worker ─────────────────────────────────
+  // ── 03 Marketing & Brand ───────────────────────────────────────────────
   {
-    id: 'sales-agent',
-    name: 'Sales Agent',
-    description: 'Aggregates the revenue pipeline workers for Sales.',
-    departmentId: 'dept-sales',
-    async run() {
-      const [crm, processors] = await Promise.all([attioStatus(), processorConfirmationRun()]);
-      return {
-        ok: crm.state === 'connected' || processors.ok,
-        summary: `Sales pipeline · Ledger ${crm.state === 'connected' ? 'LIVE' : 'DOWN'} · processors ${label(processors)} · PayKit/FlexPay/calls lanes mapped`,
-        data: { crm, processors },
-      };
-    },
+    id: 'marketing-director',
+    name: 'Marketing Director',
+    description: 'Diagnoses marketing requests and routes each to exactly one specialist, gated on voice check + sign-off.',
+    departmentId: 'dept-marketing-brand',
+    run: plannedRun('Orchestrator only — never executes a skill itself, routes to the 7 specialists below.'),
   },
   {
-    id: 'launchpad-cohort-sales',
-    name: 'Launchpad Cohort',
-    description:
-      'Launchpad Cohort sales lane: WebinarJam funnel (registrants/attendees → leads), Trakyo revenue attribution, plus offer/call/payment context.',
-    departmentId: 'dept-sales',
-    async run() {
-      const [webinar, trakyo] = await Promise.all([webinarjamStatus(), trakyoStatus()]);
-      const live = [webinar, trakyo].filter((s) => s.state === 'connected').length;
-      return {
-        ok: live > 0,
-        summary: `Launchpad Cohort · WebinarJam ${webinar.state} · Trakyo ${trakyo.state}${
-          live === 0 ? ' — set WEBINARJAM_API_KEY to pull webinar leads' : ''
-        }`,
-        data: { webinar, trakyo },
-      };
-    },
-    chatTools(): LlmToolSpec[] {
-      return [
-        {
-          name: 'searchWebinarRegistrants',
-          description:
-            "List registrants/attendees for an Launchpad Cohort WebinarJam session (these are leads). Read-only. Needs the webinar's id and schedule id.",
-          parameters: z.object({
-            webinarId: z.string().describe('WebinarJam webinar_id'),
-            scheduleId: z.string().describe('WebinarJam schedule_id for the session'),
-          }),
-          execute: async (args) => {
-            const webinarId = typeof args.webinarId === 'string' ? args.webinarId : '';
-            const scheduleId = typeof args.scheduleId === 'string' ? args.scheduleId : '';
-            if (!webinarId || !scheduleId) return { error: 'webinarId and scheduleId are required' };
-            const registrants = await listRegistrants(webinarId, scheduleId);
-            return { count: registrants.length, registrants: registrants.slice(0, 25) };
-          },
-        },
-      ];
-    },
+    id: 'brand-positioning',
+    name: 'Brand & Positioning',
+    description: 'Runs the voice-and-positioning check every marketing draft passes through before reaching Ramesh.',
+    departmentId: 'dept-marketing-brand',
+    run: skillRun('/brand-voice-audit', 'Checks banned vocabulary, register, and ICP scope against company.yaml.'),
   },
   {
-    id: 'vantage-sales',
-    name: 'Vantage',
-    description: 'Vantage sales lane: pipeline, PayKit context, payments, and call data.',
-    departmentId: 'dept-sales',
-    run: plannedLaneRun('Vantage sales', 'connect Vantage-specific CRM/payment/call sources'),
+    id: 'content-strategy',
+    name: 'Content Strategy',
+    description: 'Decides what ILS publishes against its 9 content pillars and briefs LinkedIn or Copywriting.',
+    departmentId: 'dept-marketing-brand',
+    run: plannedRun('Would pick a pillar and a real documented pain point, then hand a dated content brief downstream.'),
   },
   {
-    id: 'paykit-sales',
-    name: 'PayKit',
-    description: 'PayKit offer/payment/customer context for Sales.',
-    departmentId: 'dept-sales',
-    run: envIntegrationRun('PayKit', 'FANBASIS_API_KEY', 'offers, customers, and payment context'),
+    id: 'linkedin',
+    name: 'LinkedIn',
+    description: 'Drafts LinkedIn posts from Content Strategy’s brief — ILS’s primary organic acquisition channel.',
+    departmentId: 'dept-marketing-brand',
+    run: skillRun('/linkedin-post-draft', 'Takes a Content Strategy brief and drafts hook → body → CTA in ILS’s voice.'),
   },
   {
-    id: 'vantage-paykit',
-    name: 'Vantage PayKit',
-    description: 'PayKit lane specifically under Vantage.',
-    departmentId: 'dept-sales',
-    run: envIntegrationRun('Vantage PayKit', 'FANBASIS_API_KEY', 'Vantage offer/payment context'),
-  },
-  { id: 'stripe-sales', name: 'Stripe', description: 'Stripe payment confirmation for sales workflows.', departmentId: 'dept-sales', run: stripeSalesRun },
-  {
-    id: 'processor-confirmation',
-    name: 'Processor Confirm',
-    description: 'Confirms payment states across configured processor APIs.',
-    departmentId: 'dept-sales',
-    run: processorConfirmationRun,
+    id: 'copywriting',
+    name: 'Copywriting',
+    description: 'Writes landing-page, email, and ad copy structured around "diagnose before prescribe."',
+    departmentId: 'dept-marketing-brand',
+    run: plannedRun('Would draft offer-ladder copy, flagging any missing proof point as a gap instead of inventing one.'),
   },
   {
-    id: 'flexpay-financing',
-    name: 'FlexPay Financing',
-    description: 'FlexPay financing options for offers and payment plans.',
-    departmentId: 'dept-sales',
-    run: envIntegrationRun('FlexPay', 'FlexPay_API_KEY', 'financing options for sales offers'),
+    id: 'campaign-management',
+    name: 'Campaign Management',
+    description: 'Coordinates specialists’ output into a timed campaign push around a live offer.',
+    departmentId: 'dept-marketing-brand',
+    run: plannedRun('Would assemble a campaign brief: offer, funnel step, asset list with owners, and timeline.'),
   },
   {
-    id: 'sales-calls-data',
-    name: 'Sales Calls Data',
-    description: 'Sales call recordings, notes, outcomes, and follow-up context.',
-    departmentId: 'dept-sales',
-    run: envIntegrationRun('Sales calls data', 'FATHOM_API_KEY', 'call recordings, summaries, and follow-up context'),
+    id: 'lead-nurture',
+    name: 'Lead Nurture',
+    description: 'Builds educational follow-up for interested-but-not-ready prospects — no sequence exists today.',
+    departmentId: 'dept-marketing-brand',
+    run: plannedRun('Would design a stage-gated nurture touch mapped to a named objection — first build, nothing to refine yet.'),
+  },
+  {
+    id: 'marketing-analytics',
+    name: 'Marketing Analytics',
+    description: 'Measures marketing outcomes against the MRR north-star metric.',
+    departmentId: 'dept-marketing-brand',
+    run: plannedRun('Nothing is instrumented yet — first deliverable is an honest instrumentation-gap memo, not a fabricated metric.'),
   },
 
-  // ── Knowledge: the G-Brain analyst and its auditors ──────────────────
-  {
-    id: 'data-agent',
-    name: 'Data Agent',
-    description: 'Analyzes markdown + vector storage health and surfaces ideas; answers broadcasts by querying G-Brain.',
-    departmentId: 'dept-tech',
-    async run() {
-      const overview = await createGBrainProvider().overview();
-      const { store, doctor } = overview;
-      const warnings = doctor.checks.filter((c) => c.status !== 'ok');
-      const biggest = [...store.folders].sort((a, b) => b.files - a.files)[0];
-      const inbox = store.folders.find((f) => f.name === 'inbox');
-
-      const ideas: string[] = [];
-      if (!doctor.connected) ideas.push('gbrain CLI unreachable — check the binary before trusting vector queries');
-      if (doctor.connected && warnings.length > 0)
-        ideas.push(`${warnings.length} doctor check(s) need attention (${warnings.map((w) => w.name).join(', ')})`);
-      if (inbox && inbox.files > 3) ideas.push(`inbox/ holds ${inbox.files} unprocessed pages — file or archive them`);
-      if (store.totalFiles < 50)
-        ideas.push(`only ${store.totalFiles} pages on disk vs ~1240 in Supabase — run \`gbrain export\` to restore locally`);
-      if (ideas.length === 0) ideas.push('storage healthy — no action needed');
-
-      return {
-        ok: doctor.connected,
-        summary: `${doctor.detail} · ${store.totalFiles} md pages (largest: ${biggest?.name ?? 'n/a'} ${biggest?.files ?? 0}) · ideas: ${ideas.join(' | ')}`,
-        data: { overview, ideas },
-      };
-    },
-    async respond(message: string) {
-      const results = await getBrainProvider().search(message);
-      if (results.length === 0) {
-        return { ok: false, summary: `Nothing in G-Brain matches "${message.slice(0, 80)}"` };
-      }
-      return {
-        ok: true,
-        summary: results
-          .slice(0, 3)
-          .map((r) => `${r.title}: ${r.snippet.slice(0, 100)}`)
-          .join(' · '),
-        data: results,
-      };
-    },
-    chatTools(): LlmToolSpec[] {
-      return [
-        {
-          name: 'searchGBrain',
-          description:
-            'Search the G-Brain knowledge base (brain-store markdown + vector store) and return the top matching notes. Read-only.',
-          parameters: z.object({ query: z.string().describe('what to look up in the knowledge base') }),
-          execute: async (args) => {
-            const query = typeof args.query === 'string' ? args.query : '';
-            const results = await getBrainProvider().search(query);
-            return results.slice(0, 5);
-          },
-        },
-      ];
-    },
-  },
-  {
-    id: 'markdown-auditor',
-    name: 'Markdown Auditor',
-    description: 'Page counts per brain-store folder, strays at the root.',
-    departmentId: 'dept-tech',
-    async run() {
-      const { store } = await createGBrainProvider().overview();
-      if (store.totalFiles === 0) {
-        return { ok: false, summary: `brain-store empty or unreadable at ${store.path}` };
-      }
-      const root = store.folders.find((f) => f.name === '(root)');
-      return {
-        ok: true,
-        summary: `${store.totalFiles} pages across ${store.folders.length} folders${root ? ` · ${root.files} stray at root` : ''} · ${store.folders.map((f) => `${f.name}:${f.files}`).join(' ')}`,
-        data: store,
-      };
-    },
-  },
-  {
-    id: 'vector-auditor',
-    name: 'Vector Auditor',
-    description: 'gbrain doctor: Supabase pgvector connection, embeddings, health score.',
-    departmentId: 'dept-tech',
-    async run() {
-      const { doctor } = await createGBrainProvider().overview();
-      const warn = doctor.checks.filter((c) => c.status !== 'ok');
-      return {
-        ok: doctor.connected,
-        summary: doctor.connected
-          ? `health ${doctor.healthScore ?? '?'}/100 · ${doctor.checks.length} checks, ${warn.length} warning(s)${warn.length ? `: ${warn.map((w) => w.name).join(', ')}` : ''}`
-          : `doctor offline — ${doctor.detail}`,
-        data: doctor,
-      };
-    },
-  },
-  {
-    id: 'notion-sync',
-    name: 'Notion Sync',
-    description: 'Lists the most recently edited Notion pages shared with the integration.',
-    departmentId: 'dept-tech',
-    async run() {
-      if (!process.env.NOTION_API_KEY) {
-        return { ok: false, summary: 'Notion not configured — set NOTION_API_KEY in .env.local' };
-      }
-      const pages = await recentPages(10);
-      return {
-        ok: true,
-        summary: `${pages.length} recently edited pages · latest: ${pages[0]?.title ?? 'none'}`,
-        data: pages,
-      };
-    },
-  },
-
-  // ── Finance ──────────────────────────────────────────────────────────
-  {
-    id: 'payments-pulse',
-    name: 'Payments Pulse',
-    description: 'Verifies payment processor connections and reports Stripe balance + recent charges.',
-    departmentId: 'dept-finance',
-    async run() {
-      const configured = configuredProcessors(process.env).filter((p) => p.configured);
-      if (configured.length === 0) {
-        return { ok: false, summary: 'No payment processors configured — start with STRIPE_SECRET_KEY in .env.local' };
-      }
-      if (configured.some((p) => p.id === 'stripe')) {
-        const snapshot = await stripeSnapshot(process.env);
-        const available = snapshot.available[0];
-        return {
-          ok: true,
-          summary: `Stripe: ${((available?.amount ?? 0) / 100).toFixed(2)} ${(available?.currency ?? 'usd').toUpperCase()} available · ${snapshot.recentCharges.length} recent charges`,
-          data: snapshot,
-        };
-      }
-      return { ok: true, summary: `${configured.map((p) => p.name).join(', ')} configured (no live client yet)` };
-    },
-  },
-  {
-    id: 'crm-pulse',
-    name: 'Ledger CRM',
-    description: 'Queries the Ledger deals pipeline (Vantage + Launchpad Cohort). Read-scoped.',
-    departmentId: 'dept-sales',
-    async run() {
-      const status = await attioStatus();
-      return { ok: status.state === 'connected', summary: status.detail, data: status.meta };
-    },
-  },
-
-  // ── Clients ──────────────────────────────────────────────────────────
-  {
-    id: 'client-roster',
-    name: 'Client Roster',
-    description: 'The live client list: funnel journeys reconciled with Ledger, counted by venture and status.',
-    departmentId: 'dept-clients',
-    async run() {
-      const db = getDb();
-      const journeys = db.funnel.journeys();
-      const converted = journeys.filter((j) => j.status === 'converted');
-      const live = await attioClients();
-      const servingAttio = live.state === 'connected' && live.clients.length > 0;
-      const byVenture = new Map<string, number>();
-      for (const j of converted) byVenture.set(j.venture, (byVenture.get(j.venture) ?? 0) + 1);
-      const ventures = [...byVenture.entries()].map(([v, n]) => `${v} ${n}`).join(' · ') || 'none yet';
-      return {
-        ok: true,
-        summary: servingAttio
-          ? `Serving Ledger live: ${live.clients.length} deals on the roster · funnel backup holds ${converted.length} clients`
-          : `Serving seeded funnel: ${converted.length} clients (${ventures}) · ${journeys.length - converted.length} in pipeline · Ledger ${live.state}`,
-        data: {
-          source: servingAttio ? 'ledger' : 'funnel',
-          ledger: { state: live.state, deals: live.clients.length },
-          clients: converted.map((j) => ({ id: j.id, name: j.name, venture: j.venture, amountUsd: j.amountUsd })),
-        },
-      };
-    },
-  },
+  // ── 04 Client Success & Coaching ───────────────────────────────────────
   {
     id: 'client-onboarding',
-    name: 'Onboarding Agent',
-    description: 'Readiness check for the onboarding SOP: the Ledger trigger plus the Slack and Notion workspaces it provisions.',
-    departmentId: 'dept-clients',
-    async run() {
-      const { slackStatus } = await import('@/lib/connectors/slack');
-      const { notionStatus } = await import('@/lib/connectors/notion');
-      const [ledger, slack, notion] = await Promise.all([attioStatus(), slackStatus(), notionStatus()]);
-      const live = [ledger, slack, notion].filter((s) => s.state === 'connected').length;
-      return {
-        ok: live > 0,
-        summary: `Onboarding rails: Ledger ${ledger.state} · Slack ${slack.state} · Notion ${notion.state}${
-          live < 3 ? ' — connect the missing rail to run onboarding end to end' : ''
-        }`,
-        data: { ledger: ledger.state, slack: slack.state, notion: notion.state },
-      };
-    },
+    name: 'Client Onboarding',
+    description: 'Designs onboarding for new course members and coaching clients — a confirmed real gap.',
+    departmentId: 'dept-client-success',
+    run: plannedRun('Would design an onboarding flow for both the course and 1:1 coaching tracks — none exists today.'),
   },
   {
-    id: 'client-success',
-    name: 'Client Success',
-    description: 'Servicing rails: Recall call notes for deliverable tracking plus Slack for the check-in cadence.',
-    departmentId: 'dept-clients',
-    async run() {
-      const { slackStatus } = await import('@/lib/connectors/slack');
-      const slack = await slackStatus();
-      const recall = process.env.FATHOM_API_KEY ? 'configured' : 'not_configured';
-      const live = (slack.state === 'connected' ? 1 : 0) + (recall === 'configured' ? 1 : 0);
-      return {
-        ok: live > 0,
-        summary: `Servicing rails: Recall ${recall} · Slack ${slack.state}${
-          live === 0 ? ' — set FATHOM_API_KEY and a Slack bot token to service clients' : ''
-        }`,
-        data: { recall, slack: slack.state },
-      };
-    },
+    id: 'coaching-preparation',
+    name: 'Coaching Preparation',
+    description: 'Preps Ramesh for recurring 1:1 sessions by carrying context forward between meetings.',
+    departmentId: 'dept-client-success',
+    run: plannedRun('Blocked until a session-history record exists to carry context forward from.'),
+  },
+  {
+    id: 'session-follow-up',
+    name: 'Session Follow-Up',
+    description: 'Sends the post-session recap and commitment log after a 1:1 coaching session.',
+    departmentId: 'dept-client-success',
+    run: plannedRun('Would draft a session recap and hand confirmed commitments to the Accountability agent — no template exists yet.'),
+  },
+  {
+    id: 'accountability',
+    name: 'Accountability',
+    description: 'Turns captured commitments into a check-in rhythm aligned with RAGE’s Accountability Rhythms.',
+    departmentId: 'dept-client-success',
+    run: plannedRun('Depends on Session Follow-Up capturing real commitments first — nothing to track yet.'),
+  },
+  {
+    id: 'client-health',
+    name: 'Client Health',
+    description: 'Assesses retention risk for active coaching clients.',
+    departmentId: 'dept-client-success',
+    run: plannedRun('No health-scoring system or client database exists — honest answer today is "not enough data" for every client.'),
   },
 
-  // ── Automations ──────────────────────────────────────────────────────
+  // ── 05 Programs & Curriculum ───────────────────────────────────────────
   {
-    id: 'stack-monitor',
-    name: 'Stack Monitor',
-    description: 'Live check of the local creative/infra stack: Reelkit, Ollama, command-center, Clawline, tmux, whisper, ffmpeg, renderly, gh.',
-    departmentId: 'dept-tech',
-    async run() {
-      const [stack, dictate] = await Promise.all([localStackStatus(), wisprStatus()]);
-      return {
-        ok: stack.state === 'connected',
-        summary: `${stack.detail} · Dictate: ${dictate.state === 'connected' ? dictate.detail : dictate.state}`,
-        data: { stack: stack.meta, dictate: dictate.meta },
-      };
-    },
+    id: 'curriculum',
+    name: 'Curriculum',
+    description: 'Owns the structural integrity of the LEVERAGE Framework’s 10 delivered modules.',
+    departmentId: 'dept-programs-curriculum',
+    run: plannedRun('Would audit module sequencing against the confirmed 10-module structure before any restructuring.'),
+  },
+  {
+    id: 'leverage-framework',
+    name: 'LEVERAGE Framework',
+    description: 'Protects LEVERAGE as a concept so no department uses the name as a generic buzzword.',
+    departmentId: 'dept-programs-curriculum',
+    run: plannedRun('Would check any LEVERAGE/RAGE reference against the real philosophy definition before it ships.'),
+  },
+  {
+    id: 'assessment',
+    name: 'Assessment',
+    description: 'Owns the designed-but-unbuilt ILS Scalability Readiness Assessment.',
+    departmentId: 'dept-programs-curriculum',
+    run: plannedRun('Would build the assessment questions, scoring logic, and results page — the clearest unbuilt asset in the workspace.'),
+  },
+  {
+    id: 'learning-materials',
+    name: 'Learning Materials',
+    description: 'Routes course-content production requests to Coach Foundation and decisions back to Ramesh.',
+    departmentId: 'dept-programs-curriculum',
+    run: plannedRun('Would track per-module material status and flag gaps to Curriculum — mostly a boundary-keeper role.'),
+  },
+
+  // ── 06 Operations ───────────────────────────────────────────────────────
+  {
+    id: 'operations-manager',
+    name: 'Operations Manager',
+    description: 'Owns the in-progress Coach Foundation CRM workflow audit — ILS’s richest real evidence base.',
+    departmentId: 'dept-operations',
+    run: plannedRun('Would finish and maintain the CRM workflow audit, then use it as the basis for ILS’s first real SOPs.'),
+  },
+  {
+    id: 'sop',
+    name: 'SOP',
+    description: 'Turns ILS’s real, already-running CRM processes into documented SOPs.',
+    departmentId: 'dept-operations',
+    run: plannedRun('Would write the first SOPs from the CRM audit and the documented sales process once the audit is complete.'),
+  },
+  {
+    id: 'workflow',
+    name: 'Workflow',
+    description: 'Owns the live catalog of ILS’s 18 Coach Foundation CRM automations.',
+    departmentId: 'dept-operations',
+    run: plannedRun('Ongoing manual cataloging — captures trigger/steps/timing per automation, flags truncated names as open questions.'),
+  },
+  {
+    id: 'quality-control',
+    name: 'Quality Control',
+    description: 'Spot-checks output workspace-wide against the truth gate, owner-approval, and voice-fidelity invariants.',
+    departmentId: 'dept-operations',
+    run: plannedRun('Would spot-check recent client-facing output against INV-1/INV-2/INV-3 and report patterns to Operations Manager.'),
+  },
+
+  // ── 07 Finance ────────────────────────────────────────────────────────
+  {
+    id: 'financial-analysis',
+    name: 'Financial Analysis',
+    description: 'Works from real pricing; reports LTV:CAC and gross margin as genuinely untracked.',
+    departmentId: 'dept-finance',
+    run: plannedRun('No cost/spend data exists — first deliverable is an instrumentation-gap memo, not an estimated margin.'),
+  },
+  {
+    id: 'revenue-forecasting',
+    name: 'Revenue Forecasting',
+    description: 'Forecasts against the MRR north-star metric.',
+    departmentId: 'dept-finance',
+    run: plannedRun('Blocked until Client Health, Pipeline, and Marketing Analytics each close their own instrumentation gaps.'),
+  },
+  {
+    id: 'billing-review',
+    name: 'Billing Review',
+    description: 'Reviews billing and payment operations.',
+    departmentId: 'dept-finance',
+    run: plannedRun('The actual billing/payment system isn’t confirmed yet — that’s the first open question to resolve with Ramesh.'),
+  },
+
+  // ── 08 Research & Business Intelligence ────────────────────────────────
+  {
+    id: 'company-research',
+    name: 'Company Research',
+    description: 'Researches a specific prospect’s company ahead of a complimentary session.',
+    departmentId: 'dept-research-bi',
+    run: plannedRun('Would summarize a prospect’s public info against the qualification criteria before a booked session.'),
+  },
+  {
+    id: 'market-intelligence',
+    name: 'Market Intelligence',
+    description: 'Owns closing the not-started market-research-brief gap.',
+    departmentId: 'dept-research-bi',
+    run: plannedRun('First deliverable is the market research brief foundations_status flags as not_started.'),
+  },
+  {
+    id: 'competitive-intelligence',
+    name: 'Competitive Intelligence',
+    description: 'Tracks ILS’s competitive landscape — no competitor is named anywhere yet.',
+    departmentId: 'dept-research-bi',
+    run: plannedRun('Nothing to track beyond the documented category-level objection pattern until Ramesh names real reference points.'),
+  },
+  {
+    id: 'strategic-research',
+    name: 'Strategic Research',
+    description: 'Surfaces citable concepts from Ramesh’s defended DBA dissertation for coaching and content.',
+    departmentId: 'dept-research-bi',
+    run: plannedRun('Would cite Switching-Cost Theory / "partial switching" per INV-8 when a question touches retention or positioning.'),
+  },
+
+  // ── 09 Technology & AI Systems ──────────────────────────────────────────
+  {
+    id: 'ai-systems-architect',
+    name: 'AI Systems Architect',
+    description: 'Owns this workspace’s own agent and skill architecture.',
+    departmentId: 'dept-tech-ai',
+    run: plannedRun('Would check any new agent/skill against real company.yaml evidence before it’s authored.'),
+  },
+  {
+    id: 'automation',
+    name: 'Automation',
+    description: 'Owns the technical build side of ILS’s CRM automations, once the workflow audit is complete.',
+    departmentId: 'dept-tech-ai',
+    run: plannedRun('No platform access to Coach Foundation — would specify changes for Ramesh to implement, once the audit closes.'),
+  },
+  {
+    id: 'crm',
+    name: 'CRM',
+    description: 'Owns ILS’s understanding of the Coach Foundation platform itself.',
+    departmentId: 'dept-tech-ai',
+    run: plannedRun('Would recommend whether/how to formally mount Coach Foundation as a tool, once the workflow audit is complete.'),
+  },
+  {
+    id: 'knowledge-management',
+    name: 'Knowledge Management',
+    description: 'Maintains ILS’s reference/ folder as a pointer into the shared cross-venture DBA knowledge pool.',
+    departmentId: 'dept-tech-ai',
+    run: plannedRun('Would periodically check that reference/academic-research stays a pointer, not a copy.'),
+  },
+
+  // ── 10 Legal, Risk & Compliance ─────────────────────────────────────────
+  {
+    id: 'contract-review',
+    name: 'Contract Review',
+    description: 'Reviews contracts and agreements — none are on file yet.',
+    departmentId: 'dept-legal-risk',
+    run: plannedRun('No contract exists to review — first step is asking Ramesh what agreements actually exist.'),
+  },
+  {
+    id: 'risk-review',
+    name: 'Risk Review',
+    description: 'Owns the one real, concrete risk flag: the WHA confidentiality obligation on dissertation data.',
+    departmentId: 'dept-legal-risk',
+    run: plannedRun('Would enforce the WHA confidentiality boundary whenever Strategic Research draws on the dissertation.'),
+  },
+  {
+    id: 'compliance',
+    name: 'Compliance',
+    description: 'Checks ILS’s compliance posture — no formal framework is documented yet.',
+    departmentId: 'dept-legal-risk',
+    run: plannedRun('No compliance scope has been established — first step is asking Ramesh what concern he actually has in mind.'),
   },
 ];

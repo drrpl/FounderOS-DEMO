@@ -80,7 +80,18 @@ describe('buildKnowledgeGraph — dept → task → worker → tools chain', () 
     const teams = nodes.filter((n) => n.kind === 'team');
     expect(teams.map((t) => t.label).sort()).toEqual(['Sales', 'TECH']);
     expect(teams.every((t) => t.ring === 1)).toBe(true);
-    expect(teams.find((t) => t.label === 'Sales')?.color).toBe('#ef4444');
+    // this fixture's 'dept-sales'/'dept-tech' ids are local test doubles, not
+    // real seeded department ids, so neither resolves a life-area tint here —
+    // covered separately below with a real-resolving department id.
+    expect(teams.find((t) => t.label === 'Sales')?.color).toBeUndefined();
+  });
+
+  test('a team tinted with its real life-area color when the department id actually resolves', () => {
+    const realDepts = [dept('dept-sales-bd', 'Sales & Business Development')];
+    const realAgents: Agent[] = [agent({ id: 'sa', departmentId: 'dept-sales-bd', name: 'Sales Agent', tools: [] })];
+    const { nodes } = buildKnowledgeGraph(realAgents, realDepts, [], []);
+    const team = nodes.find((n) => n.kind === 'team');
+    expect(team?.color).toBe('#ef4444'); // life-map.ts's real 'sales' area color
   });
 
   test('one task node per SOP task on ring 2, labeled with the job title', () => {

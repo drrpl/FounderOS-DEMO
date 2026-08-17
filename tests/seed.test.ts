@@ -44,16 +44,20 @@ describe('seedDatabase', () => {
     }
   });
 
-  test('the six operating pillars, in order', () => {
+  test('the ten ILS departments, in order', () => {
     db = openDb(':memory:');
     seedDatabase(db);
     expect(db.departments.all().map((d) => d.name)).toEqual([
-      'Sales',
-      'Marketing/Growth',
-      'TECH',
-      'Finances',
-      'Communications',
-      'Clients',
+      'Executive Office',
+      'Sales & Business Development',
+      'Marketing & Brand',
+      'Client Success & Coaching',
+      'Programs & Curriculum',
+      'Operations',
+      'Finance',
+      'Research & Business Intelligence',
+      'Technology & AI Systems',
+      'Legal, Risk & Compliance',
     ]);
   });
 
@@ -61,46 +65,78 @@ describe('seedDatabase', () => {
     db = openDb(':memory:');
     seedDatabase(db);
     const byId = new Map(db.agents.all().map((a) => [a.id, a.departmentId]));
-    // Sales: the deal / account / CRM lanes
+    expect(byId.get('chief-of-staff')).toBe('dept-executive');
+    expect(byId.get('strategy')).toBe('dept-executive');
+    // Sales & Business Development
+    for (const id of ['discovery-preparation', 'lead-qualification', 'pipeline', 'proposal', 'sales-follow-up']) {
+      expect(byId.get(id)).toBe('dept-sales-bd');
+    }
+    // Marketing & Brand: the 7 specialists + director
     for (const id of [
-      'sales-agent',
-      'crm-pulse',
-      'launchpad-cohort-sales',
-      'vantage-sales',
-      'vantage-paykit',
-      'sales-calls-data',
+      'marketing-director',
+      'brand-positioning',
+      'content-strategy',
+      'linkedin',
+      'copywriting',
+      'campaign-management',
+      'lead-nurture',
+      'marketing-analytics',
     ]) {
-      expect(byId.get(id)).toBe('dept-sales');
+      expect(byId.get(id)).toBe('dept-marketing-brand');
     }
-    // Finances: the payment processors moved off Sales
+    expect(db.agents.all().filter((a) => a.departmentId === 'dept-marketing-brand').length).toBe(8);
+    // Operations: manager + 3 specialists
+    for (const id of ['operations-manager', 'sop', 'workflow', 'quality-control']) {
+      expect(byId.get(id)).toBe('dept-operations');
+    }
+    // Technology & AI Systems
+    for (const id of ['ai-systems-architect', 'automation', 'crm', 'knowledge-management']) {
+      expect(byId.get(id)).toBe('dept-tech-ai');
+    }
+  });
+
+  test('the reporting chain: Marketing specialists to the Director, Operations specialists to the Manager, everyone else straight to Chief of Staff', () => {
+    db = openDb(':memory:');
+    seedDatabase(db);
+    const byId = new Map(db.agents.all().map((a) => [a.id, a]));
+
+    expect(byId.get('chief-of-staff')?.parentId).toBeNull();
+    expect(byId.get('chief-of-staff')?.tier).toBe('lead');
+
     for (const id of [
-      'payments-pulse',
-      'stripe-sales',
-      'processor-confirmation',
-      'paykit-sales',
-      'flexpay-financing',
+      'brand-positioning',
+      'content-strategy',
+      'linkedin',
+      'copywriting',
+      'campaign-management',
+      'lead-nurture',
+      'marketing-analytics',
     ]) {
-      expect(byId.get(id)).toBe('dept-finance');
+      expect(byId.get(id)?.parentId).toBe('marketing-director');
+      expect(byId.get(id)?.tier).toBe('specialist');
     }
-    expect(db.agents.all().filter((a) => a.departmentId === 'dept-finance').length).toBeGreaterThanOrEqual(5);
-    // Marketing/Growth: the social/content crew
-    for (const id of [
-      'social-agent',
-      'postly-publisher',
-      'adsmith-creative',
-      'reelkit-editor',
-      'renderly-creative',
-      'dmflow-mcp',
-    ]) {
-      expect(byId.get(id)).toBe('dept-marketing-growth');
+    expect(byId.get('marketing-director')?.parentId).toBe('chief-of-staff');
+    expect(byId.get('marketing-director')?.tier).toBe('lead');
+
+    for (const id of ['sop', 'workflow', 'quality-control']) {
+      expect(byId.get(id)?.parentId).toBe('operations-manager');
     }
-    // TECH: AI head, the G-Brain data crew, and automations
-    for (const id of ['conductor', 'data-agent', 'markdown-auditor', 'vector-auditor', 'notion-sync', 'stack-monitor']) {
-      expect(byId.get(id)).toBe('dept-tech');
+    expect(byId.get('operations-manager')?.parentId).toBe('chief-of-staff');
+    expect(byId.get('operations-manager')?.tier).toBe('lead');
+
+    // No named head elsewhere — every other specialist routes straight to Chief of Staff.
+    for (const id of ['strategy', 'lead-qualification', 'curriculum', 'financial-analysis', 'compliance']) {
+      expect(byId.get(id)?.parentId).toBe('chief-of-staff');
     }
-    for (const id of ['comms-agent', 'gmail-worker', 'whatsapp-worker', 'slack-worker']) {
-      expect(byId.get(id)).toBe('dept-comms');
-    }
+  });
+
+  test('only the 2 grounded agents are active; the other 41 are honestly planned', () => {
+    db = openDb(':memory:');
+    seedDatabase(db);
+    const all = db.agents.all();
+    const active = all.filter((a) => a.status === 'active').map((a) => a.id).sort();
+    expect(active).toEqual(['brand-positioning', 'linkedin']);
+    expect(all.filter((a) => a.status === 'planned').length).toBe(41);
   });
 
   test('re-seeding removes departments that left the model', () => {
@@ -111,51 +147,11 @@ describe('seedDatabase', () => {
     expect(db.departments.all().some((d) => d.id === 'dept-ghost')).toBe(false);
   });
 
-  test('instance agents have task workers parented beneath them', () => {
-    db = openDb(':memory:');
-    seedDatabase(db);
-    const byId = new Map(db.agents.all().map((a) => [a.id, a]));
-
-    // Comms: the channel workers that feed /comms hang off the comms agent
-    for (const worker of ['gmail-worker', 'whatsapp-worker', 'slack-worker']) {
-      expect(byId.get(worker)?.parentId).toBe('comms-agent');
-      expect(byId.get(worker)?.tier).toBe('worker');
-    }
-    // Studio: social media + content creation
-    for (const worker of ['postly-publisher', 'adsmith-creative', 'reelkit-editor', 'renderly-creative', 'dmflow-mcp']) {
-      expect(byId.get(worker)?.parentId).toBe('social-agent');
-    }
-    // Sales: CRM / account lanes hang off the sales instance
-    for (const worker of [
-      'crm-pulse',
-      'launchpad-cohort-sales',
-      'vantage-sales',
-      'sales-calls-data',
-    ]) {
-      expect(byId.get(worker)?.parentId).toBe('sales-agent');
-      expect(byId.get(worker)?.tier).toBe('worker');
-    }
-    expect(byId.get('vantage-paykit')?.parentId).toBe('vantage-sales');
-    expect(byId.get('vantage-paykit')?.tier).toBe('worker');
-    // Finances: the payment processors now report to Payments Pulse
-    for (const worker of ['stripe-sales', 'processor-confirmation', 'paykit-sales', 'flexpay-financing']) {
-      expect(byId.get(worker)?.parentId).toBe('payments-pulse');
-      expect(byId.get(worker)?.tier).toBe('worker');
-    }
-    // Knowledge: the G-Brain analyst and its auditors
-    for (const worker of ['markdown-auditor', 'vector-auditor']) {
-      expect(byId.get(worker)?.parentId).toBe('data-agent');
-    }
-    // Top-level agents are instance slots awaiting Clawline/Claude Code bindings
-    expect(byId.get('comms-agent')?.parentId).toBeNull();
-    expect(byId.get('comms-agent')?.instance).not.toBe('');
-  });
-
   test('re-seeding removes agents that left the roster', () => {
     db = openDb(':memory:');
     seedDatabase(db);
     db.agents.insert({
-      id: 'ghost', departmentId: 'dept-tech', name: 'Ghost', role: 'r', status: 'active',
+      id: 'ghost', departmentId: 'dept-tech-ai', name: 'Ghost', role: 'r', status: 'active',
       tier: 'lead', description: '', model: 'm', tools: [], parentId: null, instance: 'builtin',
     });
     seedDatabase(db);
@@ -181,10 +177,10 @@ describe('seedDatabase', () => {
     seedDatabase(db);
     const snaps = db.emailList.snapshots();
     expect(snaps.length).toBeGreaterThan(0);
-    // Latest count is the seeded "Alex Rivera" subscriber count
-    // Bumped deliberately as the list grows.
+    // Latest count is the real "Alex's Newsletter" active subscriber count
+    // (pulled from Beehiiv 2026-07-07). Bumped deliberately as the list grows.
     expect(db.emailList.latest()?.subscribers).toBe(1850);
-    // Honest shape: the list only exists from its seeded bulk import — no
+    // Honest shape: the list only exists from its 2026-05-28 bulk import — no
     // pre-import history, and nowhere near the old dummy ~30k ramp.
     expect(snaps[0].capturedAt >= '2026-05-28').toBe(true);
     for (const s of snaps) expect(s.subscribers).toBeLessThan(6000);

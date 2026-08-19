@@ -8,6 +8,7 @@ import { recentActivity } from '@/lib/agents/activity';
 import { SparkIcon } from '@/components/SparkIcon';
 import { Badge, Dot, Label, SectionHead } from '@/components/terminal';
 import { lifeAreaForDepartment } from '@/lib/life-map';
+import { getCurrentWorkspaceId } from '@/lib/workspace-context';
 import type { Agent, AgentCron, AgentMessage, AgentRun, AgentTask } from '@/lib/schemas';
 
 /** Perceived brightness 0–1 of a #rrggbb color (for the white guard below). */
@@ -26,7 +27,7 @@ function brightness(hex: string): number {
  */
 function emblemShade(agent: Agent): string {
   if (agent.id === 'conductor') return 'var(--text)';
-  const color = lifeAreaForDepartment(agent.departmentId)?.color;
+  const color = lifeAreaForDepartment(agent.departmentId, getCurrentWorkspaceId())?.color;
   if (!color || brightness(color) > 0.85) return 'var(--text)';
   return color;
 }

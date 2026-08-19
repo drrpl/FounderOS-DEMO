@@ -1,13 +1,24 @@
 /**
- * ILS's life map: the radial taxonomy at the heart of the OS.
+ * The life map: the radial taxonomy at the heart of the OS, one per company.
  * Center = Ramesh's life; ring 1 = color-coded life areas; ring 2 = the
  * modules inside each area. Communication additionally carries the contact
  * tier system — the numbered/colored response-priority ladder for people.
  *
- * This is the one place colors enter the otherwise black & white OS:
- * each life area owns a hue, and everything underneath inherits it.
+ * This is the one place colors enter the otherwise black & white OS: each
+ * life area owns a hue, and everything underneath inherits it. The seven
+ * areas (marketing/sales/finances/communication/clients/knowledge/operations)
+ * are a universal business skeleton reused across all three companies; what
+ * differs per workspace is which agents/modules/departments actually fill
+ * them in — ILS's is real and populated, Eloan4Home's and Real Estate OS's
+ * are honestly thin scaffolds (each source workspace's agents/README.md
+ * says "empty by design").
+ *
+ * Kept free of server-only imports (next/headers) — client components read
+ * these too. Server call sites resolve the current workspace themselves
+ * (lib/workspace-context.ts) and pass the id in explicitly.
  */
 import type { LifeMap, LifeMapNode } from '@/lib/schemas';
+import { DEFAULT_WORKSPACE_ID, type WorkspaceId } from '@/lib/workspaces';
 
 export type LifeModule = { id: string; label: string; detail: string };
 
@@ -17,12 +28,12 @@ export type LifeArea = {
   color: string;
   detail: string;
   modules: LifeModule[];
-  agents: string[]; // RuntimeAgent ids working this area
+  agents: string[]; // RuntimeAgent ids working this area, in this workspace
   brainFolders: string[]; // brain-store folders feeding this area
-  departmentIds: string[]; // seeded departments that roll up to this area
+  departmentIds: string[]; // this workspace's seeded departments that roll up to this area
 };
 
-export const LIFE_AREAS: LifeArea[] = [
+const ILS_LIFE_AREAS: LifeArea[] = [
   {
     id: 'marketing',
     label: 'Marketing',
@@ -161,6 +172,43 @@ export const LIFE_AREAS: LifeArea[] = [
   },
 ];
 
+// Eloan4Home (Encoded Businesses/Eloan4Home, scaffold built 2026-08-12): sole
+// Broker/Loan Officer, no agents or skills yet — the same 7-area skeleton
+// with everything honestly empty except the one real department it rolls up to.
+const ELOAN4HOME_LIFE_AREAS: LifeArea[] = [
+  { id: 'marketing', label: 'Marketing', color: '#f59e0b', detail: 'Borrower- and realtor-partner-facing marketing — not yet systematized.', modules: [], agents: [], brainFolders: [], departmentIds: [] },
+  { id: 'sales', label: 'Sales', color: '#ef4444', detail: 'Lead to funded loan — Prospects through Closed in Encompass.', modules: [], agents: [], brainFolders: [], departmentIds: ['dept-lending'] },
+  { id: 'finances', label: 'Finances', color: '#22c55e', detail: 'Rates, APRs, and fees come from a live pricing engine (Encompass/Loanzify), never estimated.', modules: [], agents: [], brainFolders: [], departmentIds: [] },
+  { id: 'communication', label: 'Communication', color: '#3b82f6', detail: 'Borrower and realtor-partner communication — no unified inbox yet.', modules: [], agents: [], brainFolders: [], departmentIds: [] },
+  { id: 'clients', label: 'Clients', color: '#14b8a6', detail: 'Borrowers across the Encompass pipeline: Prospect, Processing, Closed, Withdrawn, Adverse.', modules: [], agents: [], brainFolders: [], departmentIds: ['dept-lending'] },
+  { id: 'knowledge', label: 'Knowledge', color: '#a855f7', detail: 'Loan-program one-pagers and compliance quick-reference — not yet populated.', modules: [], agents: [], brainFolders: [], departmentIds: [] },
+  { id: 'operations', label: 'Operations', color: '#fafafa', detail: 'Licensing (NMLS #237685) and compliance — fair lending, RESPA/TILA.', modules: [], agents: [], brainFolders: [], departmentIds: ['dept-lending'] },
+];
+
+// Real Estate OS (Encoded Businesses/Real Estate OS, scaffold built
+// 2026-08-13): three divisions at very different maturity. No agents or
+// skills yet — Development and Temp Housing stay labeled dormant throughout,
+// never blended with Brokerage's live track record.
+const REAL_ESTATE_LIFE_AREAS: LifeArea[] = [
+  { id: 'marketing', label: 'Marketing', color: '#f59e0b', detail: 'Buyer/seller/investor-facing marketing for the active Brokerage line.', modules: [], agents: [], brainFolders: [], departmentIds: [] },
+  { id: 'sales', label: 'Sales', color: '#ef4444', detail: 'Brokerage transactions — the only division with live deal flow.', modules: [], agents: [], brainFolders: [], departmentIds: ['dept-brokerage'] },
+  { id: 'finances', label: 'Finances', color: '#22c55e', detail: 'Valuations, comps, and ROI come from real MLS data, never estimated.', modules: [], agents: [], brainFolders: [], departmentIds: [] },
+  { id: 'communication', label: 'Communication', color: '#3b82f6', detail: 'Buyer, seller, partner, and vendor communication — no unified inbox yet.', modules: [], agents: [], brainFolders: [], departmentIds: [] },
+  { id: 'clients', label: 'Clients', color: '#14b8a6', detail: 'Brokerage clients today; Temp Housing residents once Agginym goes active.', modules: [], agents: [], brainFolders: [], departmentIds: ['dept-brokerage', 'dept-temp-housing'] },
+  { id: 'knowledge', label: 'Knowledge', color: '#a855f7', detail: 'Cornell Real Estate Development coursework and the Temp Housing reference pool (vendor roster, compliance).', modules: [], agents: [], brainFolders: [], departmentIds: ['dept-development', 'dept-temp-housing'] },
+  { id: 'operations', label: 'Operations', color: '#fafafa', detail: 'Broker sovereignty (License #01321444) across whichever brokerage-organization affiliation is current.', modules: [], agents: [], brainFolders: [], departmentIds: ['dept-brokerage'] },
+];
+
+const LIFE_AREAS_BY_WORKSPACE: Record<WorkspaceId, LifeArea[]> = {
+  ils: ILS_LIFE_AREAS,
+  eloan4home: ELOAN4HOME_LIFE_AREAS,
+  'real-estate-os': REAL_ESTATE_LIFE_AREAS,
+};
+
+export function getLifeAreas(workspaceId: WorkspaceId = DEFAULT_WORKSPACE_ID): LifeArea[] {
+  return LIFE_AREAS_BY_WORKSPACE[workspaceId] ?? LIFE_AREAS_BY_WORKSPACE[DEFAULT_WORKSPACE_ID];
+}
+
 export type ContactTier = {
   tier: number;
   label: string;
@@ -170,7 +218,8 @@ export type ContactTier = {
 };
 
 /**
- * The response-priority ladder for people Ramesh talks to.
+ * The response-priority ladder for people Ramesh talks to. Shared across
+ * companies — it's a priority scheme, not company-specific content.
  * 1 = red (clients & students), 2 = yellow (brand), 3 = green (personal).
  * Specific people get overrides via the contact_tags table.
  */
@@ -180,11 +229,11 @@ export const CONTACT_TIERS: ContactTier[] = [
   { tier: 3, label: 'Priority 3', color: '#22c55e', respond: 'when free', tags: ['personal', 'friend', 'community'] },
 ];
 
-export function lifeAreaForDepartment(departmentId: string): LifeArea | null {
-  return LIFE_AREAS.find((a) => a.departmentIds.includes(departmentId)) ?? null;
+export function lifeAreaForDepartment(departmentId: string, workspaceId: WorkspaceId = DEFAULT_WORKSPACE_ID): LifeArea | null {
+  return getLifeAreas(workspaceId).find((a) => a.departmentIds.includes(departmentId)) ?? null;
 }
 
-export function buildLifeMap(): LifeMap {
+export function buildLifeMap(workspaceId: WorkspaceId = DEFAULT_WORKSPACE_ID): LifeMap {
   const nodes: LifeMapNode[] = [
     {
       id: 'center',
@@ -199,7 +248,7 @@ export function buildLifeMap(): LifeMap {
   ];
   const edges: LifeMap['edges'] = [];
 
-  for (const area of LIFE_AREAS) {
+  for (const area of getLifeAreas(workspaceId)) {
     nodes.push({
       id: area.id,
       type: 'area',
@@ -228,20 +277,26 @@ export function buildLifeMap(): LifeMap {
     }
   }
 
-  // the contact priority ladder hangs off client management
-  for (const t of CONTACT_TIERS) {
-    const id = `tier-${t.tier}`;
-    nodes.push({
-      id,
-      type: 'tier',
-      label: `T${t.tier} ${t.label}`,
-      color: t.color,
-      parent: 'communication/client-management',
-      detail: `${t.tags.join(', ')} — respond ${t.respond}`,
-      agents: [],
-      brainFolders: [],
-    });
-    edges.push({ source: 'communication/client-management', target: id });
+  // The contact priority ladder hangs off client management — only wired in
+  // when that module actually exists (ILS today). Other workspaces' comms
+  // area has no modules yet; skip rather than link tiers to a node that
+  // isn't there.
+  const tierParent = 'communication/client-management';
+  if (nodes.some((n) => n.id === tierParent)) {
+    for (const t of CONTACT_TIERS) {
+      const id = `tier-${t.tier}`;
+      nodes.push({
+        id,
+        type: 'tier',
+        label: `T${t.tier} ${t.label}`,
+        color: t.color,
+        parent: tierParent,
+        detail: `${t.tags.join(', ')} — respond ${t.respond}`,
+        agents: [],
+        brainFolders: [],
+      });
+      edges.push({ source: tierParent, target: id });
+    }
   }
 
   return { nodes, edges };

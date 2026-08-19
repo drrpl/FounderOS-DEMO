@@ -1,6 +1,7 @@
 import { createGBrainProvider } from '@/lib/connectors/gbrain';
 import { foldersToClusters } from '@/lib/brain-viz';
 import { getDb } from '@/lib/data';
+import { getCurrentWorkspaceId } from '@/lib/workspace-context';
 import { PageHeader } from '@/components/PageHeader';
 import { BrainCore } from '@/components/BrainCore';
 import { PillarRadar } from '@/components/PillarRadar';
@@ -91,6 +92,7 @@ function FlowStep({ title, detail, dashed = false }: { title: string; detail: st
 export default async function DoctorPage() {
   const overview = await createGBrainProvider().overview();
   const { store, doctor } = overview;
+  const workspaceId = getCurrentWorkspaceId();
   const db = getDb();
   const maxFiles = Math.max(1, ...store.folders.map((f) => f.files));
   const clusters = foldersToClusters(store.folders);
@@ -158,7 +160,7 @@ export default async function DoctorPage() {
             </span>
           </div>
           <PillarRadar
-            axes={pillarRadarAxes(db.departments.all(), db.agents.all(), db.sopTasks.all(), runsByAgent)}
+            axes={pillarRadarAxes(db.departments.all(), db.agents.all(), db.sopTasks.all(), runsByAgent, workspaceId)}
             health={doctor.healthScore}
             warnings={warnings.length}
           />

@@ -1,10 +1,12 @@
 import { describe, expect, test } from 'vitest';
 import {
   CONTACT_TIERS,
-  LIFE_AREAS,
+  getLifeAreas,
   buildLifeMap,
   lifeAreaForDepartment,
 } from '@/lib/life-map';
+
+const LIFE_AREAS = getLifeAreas();
 import { LifeMapSchema } from '@/lib/schemas';
 import { realAgents } from '@/lib/agents/real';
 import { AGENT_BRAIN_SCOPES } from '@/lib/brain-graph';

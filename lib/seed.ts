@@ -1,5 +1,6 @@
 import type { FounderDb } from '@/lib/db';
 import { PERSONAS } from '@/lib/personas-seed';
+import { DEFAULT_WORKSPACE_ID, type WorkspaceId } from '@/lib/workspaces';
 import type {
   Agent,
   AgentTask,
@@ -1310,40 +1311,98 @@ ${SKILL_STATUS_NOTE[s.status] ?? s.status}
 }
 
 // The capability library the agent workforce draws on.
+// ILS's real capability library — the 2 of 43 agents that own a real,
+// running Claude Code skill (ILS/skills/*/SKILL.md). Everything else in the
+// roster is honestly `planned` at the agent level (see agents array above),
+// not padded out here with capabilities that don't exist yet.
 const skills: Omit<Skill, 'markdown'>[] = [
-  { id: 'skill-outbound', name: 'Cold outbound sequencing', category: 'Sales', description: 'Multi-touch DM + content cadence that opens conversations at scale.', ownerAgentId: 'postly-publisher', status: 'live', tools: ['postly', 'dmflow'], order: 0 },
-  { id: 'skill-qualify', name: 'Reply qualification', category: 'Sales', description: 'Reads inbound replies, scores intent, and books the qualified ones.', ownerAgentId: 'comms-agent', status: 'live', tools: ['dmflow', 'gmail'], order: 1 },
-  { id: 'skill-proposal', name: 'Proposal drafting', category: 'Sales', description: 'Turns a call transcript into a tailored, on-brand proposal.', ownerAgentId: null, status: 'learning', tools: ['proposal-gen', 'ledger'], order: 2 },
-  { id: 'skill-hooks', name: 'Hook writing', category: 'Content', description: 'Short-form hooks and captions tuned to each platform.', ownerAgentId: 'social-agent', status: 'live', tools: ['postly'], order: 3 },
-  { id: 'skill-ugc', name: 'UGC generation', category: 'Content', description: 'Generates ad-ready UGC variants (Veo / Sora / Kling).', ownerAgentId: 'adsmith-creative', status: 'live', tools: ['adsmith'], order: 4 },
-  { id: 'skill-edit', name: 'Video editing', category: 'Content', description: 'Cuts reels and highlight clips programmatically.', ownerAgentId: 'reelkit-editor', status: 'live', tools: ['reelkit'], order: 5 },
-  { id: 'skill-schedule', name: 'Cross-post scheduling', category: 'Content', description: 'Queues and publishes across every connected platform.', ownerAgentId: 'postly-publisher', status: 'live', tools: ['postly'], order: 6 },
-  { id: 'skill-triage', name: 'Inbox triage', category: 'Ops', description: 'Sorts the four inboxes into work / personal / misc and flags priority.', ownerAgentId: 'gmail-worker', status: 'live', tools: ['gmail'], order: 7 },
-  { id: 'skill-dm', name: 'DM management', category: 'Ops', description: 'Handles Instagram and WhatsApp DMs end to end.', ownerAgentId: 'comms-agent', status: 'live', tools: ['dmflow', 'whatsapp'], order: 8 },
-  { id: 'skill-retrieval', name: 'Knowledge retrieval', category: 'Ops', description: 'Hybrid search over G-Brain so every agent shares one memory.', ownerAgentId: 'conductor', status: 'live', tools: ['gbrain'], order: 9 },
-  { id: 'skill-reconcile', name: 'Payment reconciliation', category: 'Ops', description: 'Matches processor payouts to clients across Stripe and PayKit.', ownerAgentId: null, status: 'planned', tools: ['stripe', 'paykit'], order: 10 },
-  { id: 'skill-attribution', name: 'Revenue attribution', category: 'Ops', description: 'Ties content and calls to closed revenue via Trakyo.', ownerAgentId: null, status: 'planned', tools: ['trakyo', 'ghl'], order: 11 },
+  { id: 'skill-linkedin-post-draft', name: 'LinkedIn Post Draft', category: 'Marketing', description: 'Writes one publish-ready LinkedIn post in Ramesh’s voice from Content Strategy’s brief — ILS’s primary and only systematized organic acquisition channel today.', ownerAgentId: 'linkedin', status: 'live', tools: [], order: 0 },
+  { id: 'skill-brand-voice-audit', name: 'Brand Voice Audit', category: 'Marketing', description: 'Reviews a marketing draft against ILS’s real voice and positioning before it reaches Ramesh for sign-off — pass/fail per axis with line-level notes, never a silent rewrite.', ownerAgentId: 'brand-positioning', status: 'live', tools: [], order: 1 },
 ];
 
-export function seedDatabase(db: FounderDb): void {
+// --- Eloan4Home: a clean scaffold, honestly empty (Encoded Businesses/Eloan4Home,
+// built 2026-08-12). Ramesh is the sole licensed Broker/Loan Officer (NMLS
+// #237685); no agent personas or skills exist yet — a blank beats a fabricated
+// org chart. One department stands in for the whole (solo) operation so the
+// org chart and shared roadmap/metrics have somewhere honest to point.
+const eloan4homeDepartments: Department[] = [
+  { id: 'dept-lending', name: 'Residential Lending', slug: 'lending', tagline: 'Purchase and refinance lending across California. NMLS #237685.', color: '#16A34A', order: 1 },
+];
+const eloan4homeAgents: Agent[] = [];
+const eloan4homeWorkflows: Workflow[] = [];
+const eloan4homeSkills: Omit<Skill, 'markdown'>[] = [];
+const eloan4homeAgentTasks: AgentTask[] = [];
+const eloan4homeSopTasks: SopTask[] = [];
+
+// --- Real Estate OS: a clean scaffold, honestly empty (Encoded Businesses/Real
+// Estate OS, built 2026-08-13). Three divisions at very different maturity —
+// Brokerage is the only one with live activity; Development and Temp Housing
+// are dormant, pre-launch. No agent personas or skills exist yet.
+const realEstateDepartments: Department[] = [
+  { id: 'dept-brokerage', name: 'Brokerage', slug: 'brokerage', tagline: 'Active — residential real estate transactions. CA Broker License #01321444.', color: '#B45309', order: 1 },
+  { id: 'dept-development', name: 'Development', slug: 'development', tagline: 'Dormant — no active projects. Cornell Real Estate Development certification on file.', color: '#78716C', order: 2 },
+  { id: 'dept-temp-housing', name: 'Temp Housing', slug: 'temp-housing', tagline: 'Dormant — transitional housing for at-risk individuals, pre-launch (Agginym).', color: '#78716C', order: 3 },
+];
+const realEstateAgents: Agent[] = [];
+const realEstateWorkflows: Workflow[] = [];
+const realEstateSkills: Omit<Skill, 'markdown'>[] = [];
+const realEstateAgentTasks: AgentTask[] = [];
+const realEstateSopTasks: SopTask[] = [];
+
+/**
+ * The one thing that actually differs company to company: org structure, the
+ * agent roster, the capability library, and the workflows they run. Everything
+ * else seedDatabase writes below (tools, roadmap, metrics, social/funnel demo
+ * data, ...) stays shared scaffolding across all three workspaces until each
+ * company's real numbers replace it — same "blank beats fabrication" rule
+ * INV-1 applies to, just not this session's scope.
+ */
+function identityFor(workspaceId: WorkspaceId) {
+  switch (workspaceId) {
+    case 'eloan4home':
+      return {
+        departments: eloan4homeDepartments,
+        agents: eloan4homeAgents,
+        workflows: eloan4homeWorkflows,
+        skills: eloan4homeSkills,
+        agentTasks: eloan4homeAgentTasks,
+        sopTasks: eloan4homeSopTasks,
+      };
+    case 'real-estate-os':
+      return {
+        departments: realEstateDepartments,
+        agents: realEstateAgents,
+        workflows: realEstateWorkflows,
+        skills: realEstateSkills,
+        agentTasks: realEstateAgentTasks,
+        sopTasks: realEstateSopTasks,
+      };
+    case 'ils':
+    default:
+      return { departments, agents, workflows, skills, agentTasks, sopTasks };
+  }
+}
+
+export function seedDatabase(db: FounderDb, workspaceId: WorkspaceId = DEFAULT_WORKSPACE_ID): void {
+  const identity = identityFor(workspaceId);
   // INSERT OR REPLACE in every repo makes re-seeding idempotent by id.
-  for (const d of departments) db.departments.insert(d);
-  for (const a of agents) db.agents.insert(a);
+  for (const d of identity.departments) db.departments.insert(d);
+  for (const a of identity.agents) db.agents.insert(a);
   // The roster IS the runtime: rows that left the roster leave the DB too,
   // and departments that left the operating model go with them.
-  db.agents.deleteWhereIdNotIn(agents.map((a) => a.id));
-  db.departments.deleteWhereIdNotIn(departments.map((d) => d.id));
+  db.agents.deleteWhereIdNotIn(identity.agents.map((a) => a.id));
+  db.departments.deleteWhereIdNotIn(identity.departments.map((d) => d.id));
   for (const p of people) db.people.insert(p);
   db.people.deleteWhereIdNotIn(people.map((p) => p.id));
   for (const m of leadMagnets) db.leadMagnets.insert(m);
   db.leadMagnets.deleteWhereIdNotIn(leadMagnets.map((m) => m.id));
-  for (const t of sopTasks) db.sopTasks.insert(t);
-  db.sopTasks.deleteWhereIdNotIn(sopTasks.map((t) => t.id));
-  for (const w of workflows) db.workflows.insert(w);
-  db.workflows.deleteWhereIdNotIn(workflows.map((w) => w.id));
-  for (const s of skills) db.skills.insert({ ...s, markdown: skillDoc(s) });
-  db.skills.deleteWhereIdNotIn(skills.map((s) => s.id));
-  for (const t of agentTasks) db.agentTasks.insert(t); // insert-by-id; user tasks coexist
+  for (const t of identity.sopTasks) db.sopTasks.insert(t);
+  db.sopTasks.deleteWhereIdNotIn(identity.sopTasks.map((t) => t.id));
+  for (const w of identity.workflows) db.workflows.insert(w);
+  db.workflows.deleteWhereIdNotIn(identity.workflows.map((w) => w.id));
+  for (const s of identity.skills) db.skills.insert({ ...s, markdown: skillDoc(s) });
+  db.skills.deleteWhereIdNotIn(identity.skills.map((s) => s.id));
+  for (const t of identity.agentTasks) db.agentTasks.insert(t); // insert-by-id; user tasks coexist
   for (const t of tools) db.tools.insert(t);
   for (const r of roadmap) db.roadmap.insert(r);
   for (const m of metrics) db.metrics.insert(m);

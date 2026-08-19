@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
-import { LIFE_AREAS } from '@/lib/life-map';
+import { getLifeAreas } from '@/lib/life-map';
 import {
-  VENTURES,
+  getVentures,
   ventureAgentSet,
   venturesForAgent,
   getVenture,
@@ -10,6 +10,8 @@ import {
 import { realAgents } from '@/lib/agents/real';
 
 const KNOWN_AGENTS = new Set(realAgents.map((a) => a.id));
+const LIFE_AREAS = getLifeAreas();
+const VENTURES = getVentures();
 
 describe('VENTURES', () => {
   test("ILS's one real venture, with a color and brain tag", () => {

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { PanelLeft } from 'lucide-react';
 import { OsMark } from '@/components/OsMark';
 import { usePathname } from 'next/navigation';
+import { WorkspaceSwitcher } from '@/components/WorkspaceSwitcher';
 import { NAV_OPERATE, NAV_AGENTS, NAV_INTELLIGENCE, NAV_SYSTEM, NAV_LIBRARY, type NavItem } from '@/lib/nav';
 
 function NavGroup({
@@ -191,6 +192,7 @@ export function Sidebar() {
           <PanelLeft className="h-[15px] w-[15px]" strokeWidth={1.7} />
         </button>
       </div>
+      <WorkspaceSwitcher collapsed={collapsed} />
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2.5 pb-2">
         <NavGroup title="Operate" items={NAV_OPERATE} pathname={pathname} collapsed={collapsed} onTip={setTip} />
         <NavGroup title="Agents" items={NAV_AGENTS} pathname={pathname} collapsed={collapsed} onTip={setTip} />

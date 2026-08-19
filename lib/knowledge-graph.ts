@@ -1,5 +1,6 @@
 import type { Agent, Department, Person, SopTask } from '@/lib/schemas';
 import { lifeAreaForDepartment } from '@/lib/life-map';
+import { DEFAULT_WORKSPACE_ID, type WorkspaceId } from '@/lib/workspaces';
 
 /**
  * The operating-knowledge graph that powers the /brain force graph — the operator's
@@ -154,6 +155,7 @@ export function buildKnowledgeGraph(
   people: Person[] = [],
   tasks: SopTask[] = [],
   boardAgents: { id: string; name: string }[] = [],
+  workspaceId: WorkspaceId = DEFAULT_WORKSPACE_ID,
 ): KnowledgeGraph {
   const nodes: KGNode[] = [];
   const edges: KGEdge[] = [];
@@ -177,7 +179,7 @@ export function buildKnowledgeGraph(
   const usedDepts = new Set([...agents.map((a) => a.departmentId), ...people.map((p) => p.departmentId)]);
   for (const d of departments) {
     if (!usedDepts.has(d.id)) continue;
-    const color = lifeAreaForDepartment(d.id)?.color;
+    const color = lifeAreaForDepartment(d.id, workspaceId)?.color;
     nodes.push({ id: `team:${d.id}`, kind: 'team', label: d.name, ring: RING.team, color });
     edges.push({ source: SELF_ID, target: `team:${d.id}`, kind: 'pillar' });
   }

@@ -4,6 +4,8 @@ import { buildBrainGraph } from '@/lib/brain-graph';
 import { buildKnowledgeGraph } from '@/lib/knowledge-graph';
 import { demoMemoryGraph, distillMemoryGraph, type MemoryGraph } from '@/lib/memory-core';
 import { getDb } from '@/lib/data';
+import { getCurrentWorkspaceId } from '@/lib/workspace-context';
+import { getVentures } from '@/lib/ventures';
 import { PageHeader } from '@/components/PageHeader';
 import { BrainDump } from '@/components/BrainDump';
 import { BrainGraphView } from '@/components/BrainGraphView';
@@ -53,6 +55,7 @@ function memoryConstellation(): MemoryGraph {
 }
 
 export default function BrainPage() {
+  const workspaceId = getCurrentWorkspaceId();
   const db = getDb();
   // latest run per agent (oldest first so the LAST write per id is the newest)
   const runsByAgent = Object.fromEntries(
@@ -67,6 +70,8 @@ export default function BrainPage() {
     db.departments.all(),
     db.people.all(),
     db.sopTasks.all(),
+    [],
+    workspaceId,
   );
 
   return (
@@ -78,7 +83,7 @@ export default function BrainPage() {
         title="G-Brain"
         caret
         rightWide
-        right={<BrainDump compact />}
+        right={<BrainDump compact ventures={getVentures(workspaceId)} />}
       />
 
       {/* pull the graph up under the header (offsets PageHeader's shared mb-6)

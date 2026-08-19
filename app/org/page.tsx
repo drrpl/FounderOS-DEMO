@@ -2,8 +2,9 @@ import Link from 'next/link';
 import { Users } from 'lucide-react';
 import { getDb } from '@/lib/data';
 import { buildHierarchy, flattenNodes, type AgentNode } from '@/lib/hierarchy';
-import { LIFE_AREAS, lifeAreaForDepartment } from '@/lib/life-map';
-import { VENTURES, getVenture, ventureAgentSet, venturesForAgent } from '@/lib/ventures';
+import { getLifeAreas, lifeAreaForDepartment } from '@/lib/life-map';
+import { getVentures, getVenture, ventureAgentSet, venturesForAgent } from '@/lib/ventures';
+import { getCurrentWorkspaceId } from '@/lib/workspace-context';
 import { ConductorCard } from '@/components/ConductorCard';
 import { SparkIcon } from '@/components/SparkIcon';
 import { PageHeader } from '@/components/PageHeader';
@@ -20,7 +21,7 @@ const STATUS_DOT: Record<AgentStatus, string> = {
 
 /** Tiny colored dots showing which ventures an agent serves. */
 function VentureDots({ agentId }: { agentId: string }) {
-  const serving = venturesForAgent(agentId);
+  const serving = venturesForAgent(agentId, getCurrentWorkspaceId());
   if (serving.length === 0) return null;
   return (
     <span className="flex shrink-0 items-center gap-0.5">
@@ -83,13 +84,14 @@ function SystemCard({ href, title, caption }: { href: string; title: string; cap
 }
 
 export default function OrgChartPage({ searchParams }: { searchParams?: { venture?: string } }) {
+  const workspaceId = getCurrentWorkspaceId();
   const db = getDb();
   const departments = db.departments.all();
   const agents = db.agents.all();
   // The venture lens: same roster, same DB — the switcher just changes which
   // crew lights up. No venture param = everything bright.
-  const venture = getVenture(searchParams?.venture ?? '');
-  const ventureSet = venture ? ventureAgentSet(venture.id) : null;
+  const venture = getVenture(searchParams?.venture ?? '', workspaceId);
+  const ventureSet = venture ? ventureAgentSet(venture.id, workspaceId) : null;
   const dimFor = (id: string) => (ventureSet ? !ventureSet.has(id) : false);
   const conductor = agents.find((a) => a.id === 'conductor');
   // Conductor sits in the AI Head slot; the columns are everything else
@@ -117,7 +119,7 @@ export default function OrgChartPage({ searchParams }: { searchParams?: { ventur
         >
           All ventures
         </Link>
-        {VENTURES.map((v) => {
+        {getVentures(workspaceId).map((v) => {
           const active = venture?.id === v.id;
           return (
             <Link
@@ -161,7 +163,7 @@ export default function OrgChartPage({ searchParams }: { searchParams?: { ventur
       {/* Life-area legend: every crew below is tinted by the part of life it serves */}
       <div className="mb-6 flex flex-wrap items-center gap-4 rounded-lg border border-os-border bg-os-surface px-3 py-2">
         <span className="text-[9px] uppercase tracking-[0.2em] text-os-dim">Life areas</span>
-        {LIFE_AREAS.map((area) => (
+        {getLifeAreas(workspaceId).map((area) => (
           <span key={area.id} className="flex items-center gap-1.5 text-[10px] text-os-muted">
             <span className="h-2 w-2 rounded-full" style={{ background: area.color }} />
             {area.label}
@@ -217,7 +219,7 @@ export default function OrgChartPage({ searchParams }: { searchParams?: { ventur
               instanceIds.has(root.agent.id) ? root.children : [root],
             );
             const deptTools = [...new Set(all.flatMap((a) => a.tools))];
-            const area = lifeAreaForDepartment(department.id);
+            const area = lifeAreaForDepartment(department.id, workspaceId);
             return (
               <section
                 key={department.id}

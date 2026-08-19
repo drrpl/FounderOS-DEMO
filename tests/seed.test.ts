@@ -24,7 +24,10 @@ describe('seedDatabase', () => {
     expect(db.phases.all().length).toBeGreaterThanOrEqual(3);
     expect(db.workflows.all().length).toBeGreaterThanOrEqual(2);
     expect(db.workflows.all().every((w) => w.steps.length >= 3)).toBe(true);
-    expect(db.skills.all().length).toBeGreaterThanOrEqual(8);
+    // ILS's real capability library — 2 of 43 agents own a running Claude
+    // Code skill today (linkedin, brand-positioning). Not padded to a bigger
+    // number (INV-1: honest-short beats a fabricated Alex-demo catalog).
+    expect(db.skills.all().length).toBeGreaterThanOrEqual(2);
     expect(db.agentTasks.all().length).toBeGreaterThanOrEqual(8);
   });
 

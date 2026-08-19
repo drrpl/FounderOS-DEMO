@@ -1,6 +1,7 @@
 import type { Agent, AgentRun, Department, SopTask } from '@/lib/schemas';
 import { orderGraphDepartments } from '@/lib/knowledge-graph';
 import { lifeAreaForDepartment } from '@/lib/life-map';
+import { DEFAULT_WORKSPACE_ID, type WorkspaceId } from '@/lib/workspaces';
 
 /**
  * Per-pillar health for the spider chart beside the G-Brain monitor: one axis
@@ -39,6 +40,7 @@ export function pillarRadarAxes(
   agents: Agent[],
   tasks: SopTask[],
   runsByAgent: Record<string, AgentRun>,
+  workspaceId: WorkspaceId = DEFAULT_WORKSPACE_ID,
 ): PillarAxis[] {
   const ordered = orderGraphDepartments(departments, (d) => d.id);
   return ordered.map((d) => {
@@ -58,7 +60,7 @@ export function pillarRadarAxes(
     return {
       id: d.id,
       label: d.name,
-      color: lifeAreaForDepartment(d.id)?.color ?? d.color,
+      color: lifeAreaForDepartment(d.id, workspaceId)?.color ?? d.color,
       score: clamp(15, 100, Math.max(score, 15)),
       roster: Math.round(activeShare * 100),
       freshness: Math.round(recency * 100),

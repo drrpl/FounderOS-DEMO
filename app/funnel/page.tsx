@@ -23,6 +23,7 @@ import { ghlStatus } from '@/lib/connectors/ghl';
 import { trakyoStatus } from '@/lib/connectors/trakyo';
 import { metaAdsStatus } from '@/lib/connectors/meta-ads';
 import { getVenture } from '@/lib/ventures';
+import { getCurrentWorkspaceId } from '@/lib/workspace-context';
 import { FunnelRadialLazy, FunnelSpaceLazy } from '@/components/FunnelGraphsLazy';
 import { Badge, SectionHead } from '@/components/terminal';
 import {
@@ -47,7 +48,7 @@ function usd(amount: number): string {
 }
 
 function ventureColor(id: FunnelVenture): string {
-  return getVenture(id)?.color ?? 'var(--accent)';
+  return getVenture(id, getCurrentWorkspaceId())?.color ?? 'var(--accent)';
 }
 
 /** Compact source check: ✓ when connected, ○ when pending — detail on hover. */
@@ -205,7 +206,7 @@ function JourneyTableRows({
             <span
               className="h-2 w-2 shrink-0 rounded-full"
               style={{ background: ventureColor(journey.venture) }}
-              title={getVenture(journey.venture)?.label}
+              title={getVenture(journey.venture, getCurrentWorkspaceId())?.label}
             />
             <span className="min-w-0">
               <span className="block truncate text-[12.5px] font-semibold" title={journey.name}>

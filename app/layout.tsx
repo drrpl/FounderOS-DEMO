@@ -6,6 +6,8 @@ import { Topbar } from '@/components/Topbar';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ConductorPanel } from '@/components/ConductorPanel';
 import { getDb } from '@/lib/data';
+import { getCurrentWorkspaceId } from '@/lib/workspace-context';
+import { getWorkspace } from '@/lib/workspaces';
 import type { Command } from '@/lib/palette';
 import { THEME_INIT_SCRIPT } from '@/lib/theme';
 
@@ -15,10 +17,13 @@ const fontMono = JetBrains_Mono({
   variable: '--font-mono',
 });
 
-export const metadata: Metadata = {
-  title: 'FOUNDER OS',
-  description: 'Personal operating system and AI agent command center',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const workspace = getWorkspace(getCurrentWorkspaceId());
+  return {
+    title: `${workspace.shortLabel} · FOUNDER OS`,
+    description: `Personal operating system and AI agent command center — ${workspace.name}`,
+  };
+}
 
 const NAV_COMMANDS: Command[] = [
   { id: 'nav-home', label: 'Home', keywords: 'dashboard today overview start', href: '/', hint: 'view' },

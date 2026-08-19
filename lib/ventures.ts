@@ -1,16 +1,20 @@
 /**
- * ILS's one venture — the venture lens over the OS.
+ * Each company's one venture — the venture lens over its own OS.
  *
- * One database, one G-Brain, one agent roster: ventures never partition the
- * data. They are saved filters — each one names the agents that serve it per
- * life area, the brain tag that marks its pages, and the current executive
- * focus. FounderOS-DEMO originally shipped two ventures (Alex's Vantage
- * agency + Launchpad Cohort); ILS is a solo operation with exactly one real
- * venture, so this is a single-entry array, not a placeholder for a second
- * one.
+ * One database per workspace, one G-Brain per workspace, one agent roster per
+ * workspace: ventures never partition data *within* a company. They're a
+ * saved filter — the agents that serve each life area, the brain tag that
+ * marks its pages, and the current executive focus. Every company here is a
+ * solo operation with exactly one real venture (itself), so each workspace's
+ * array is a single-entry list, not a placeholder for a second one.
+ *
+ * Kept free of server-only imports — client components (BrainDump) read
+ * these too via props from a server parent, not by resolving the workspace
+ * themselves.
  */
 import type { LifeArea } from '@/lib/life-map';
-import { LIFE_AREAS } from '@/lib/life-map';
+import { getLifeAreas } from '@/lib/life-map';
+import { DEFAULT_WORKSPACE_ID, type WorkspaceId } from '@/lib/workspaces';
 
 export type Venture = {
   id: string;
@@ -18,7 +22,7 @@ export type Venture = {
   kind: string;
   color: string;
   detail: string;
-  /** Tag that marks this venture's pages inside the single shared G-Brain. */
+  /** Tag that marks this venture's pages inside its own G-Brain. */
   brainTag: string;
   /** Current executive priorities — real punch-list items, not invented. */
   focus: string[];
@@ -26,7 +30,7 @@ export type Venture = {
   areaAgents: Record<string, string[]>;
 };
 
-export const VENTURES: Venture[] = [
+const ILS_VENTURES: Venture[] = [
   {
     id: 'ils',
     label: 'Innovative Leadership Strategies',
@@ -42,7 +46,6 @@ export const VENTURES: Venture[] = [
       'Close the real company.yaml gaps: LTV:CAC and gross margin untracked, no proven headlines/hooks, no funnel conversion data yet',
     ],
     areaAgents: {
-      // Content, brand, and campaign work — Marketing & Brand department.
       marketing: [
         'marketing-director',
         'brand-positioning',
@@ -53,45 +56,80 @@ export const VENTURES: Venture[] = [
         'lead-nurture',
         'marketing-analytics',
       ],
-      // Lead-to-client pipeline — Sales & Business Development department.
       sales: ['lead-qualification', 'discovery-preparation', 'proposal', 'sales-follow-up', 'pipeline'],
-      // Pricing is real; unit economics and billing are not yet tracked — Finance department.
       finances: ['financial-analysis', 'revenue-forecasting', 'billing-review'],
-      // No unified inbox or dedicated comms department exists at ILS yet
-      // (matches lib/life-map.ts's own honest-empty call on this same area) —
-      // left unstaffed rather than force-fitting Client Success agents whose
-      // real job isn't inbox/WhatsApp/Slack triage.
       communication: [],
-      // Client Success & Coaching, plus Programs & Curriculum (the course itself).
       clients: ['client-onboarding', 'coaching-preparation', 'client-health', 'curriculum', 'leverage-framework'],
-      // Research & Business Intelligence, plus Knowledge Management (Technology & AI).
       knowledge: ['company-research', 'market-intelligence', 'competitive-intelligence', 'strategic-research', 'knowledge-management'],
-      // Operations, plus the rest of Technology & AI Systems.
       operations: ['chief-of-staff', 'operations-manager', 'sop', 'workflow', 'quality-control', 'ai-systems-architect', 'automation', 'crm'],
     },
   },
 ];
 
-export function getVenture(id: string): Venture | null {
-  return VENTURES.find((v) => v.id === id) ?? null;
+const ELOAN4HOME_VENTURES: Venture[] = [
+  {
+    id: 'eloan4home',
+    label: 'Eloan4Home',
+    kind: 'Residential mortgage brokerage',
+    color: '#16A34A',
+    detail: 'Full-service residential mortgage brokerage — Sacramento, CA. Ramesh Prasad, sole Broker/Loan Officer, NMLS #237685. Home purchase and refinance lending statewide. Relaunch phase as of 2026-08.',
+    brainTag: 'eloan4home',
+    focus: [
+      'Run the INTAKE.md interview to fill company.yaml — most compartments are still blank',
+      'Author the first skill: a borrower-facing loan-program explainer, or realtor/referral-partner outreach drafting',
+      'Populate reference/ with loan-program one-pagers and the RESPA/TILA compliance quick-reference',
+    ],
+    areaAgents: { marketing: [], sales: [], finances: [], communication: [], clients: [], knowledge: [], operations: [] },
+  },
+];
+
+const REAL_ESTATE_VENTURES: Venture[] = [
+  {
+    id: 'real-estate-os',
+    label: 'Real Estate OS',
+    kind: 'Brokerage · Development · Temp Housing',
+    color: '#B45309',
+    detail: 'Ramesh Prasad’s real estate venture, Sacramento, CA — an active residential Brokerage (CA Broker License #01321444, ~26 years), a dormant Development line (Cornell certification), and a dormant Temp Housing line (Agginym).',
+    brainTag: 'real-estate-os',
+    focus: [
+      'Run the INTAKE.md gap-closure follow-up — Brokerage compartments are ~96% complete, the rest need Ramesh',
+      'Author the first Brokerage skill: buyer/seller inquiry response, or transaction pipeline status drafting',
+      'Keep Development and Temp Housing content honestly pre-launch — never blend it with Brokerage’s live track record',
+    ],
+    areaAgents: { marketing: [], sales: [], finances: [], communication: [], clients: [], knowledge: [], operations: [] },
+  },
+];
+
+const VENTURES_BY_WORKSPACE: Record<WorkspaceId, Venture[]> = {
+  ils: ILS_VENTURES,
+  eloan4home: ELOAN4HOME_VENTURES,
+  'real-estate-os': REAL_ESTATE_VENTURES,
+};
+
+export function getVentures(workspaceId: WorkspaceId = DEFAULT_WORKSPACE_ID): Venture[] {
+  return VENTURES_BY_WORKSPACE[workspaceId] ?? VENTURES_BY_WORKSPACE[DEFAULT_WORKSPACE_ID];
+}
+
+export function getVenture(id: string, workspaceId: WorkspaceId = DEFAULT_WORKSPACE_ID): Venture | null {
+  return getVentures(workspaceId).find((v) => v.id === id) ?? null;
 }
 
 /** Every agent serving a venture, across all its life areas. */
-export function ventureAgentSet(ventureId: string): Set<string> {
-  const v = getVenture(ventureId);
+export function ventureAgentSet(ventureId: string, workspaceId: WorkspaceId = DEFAULT_WORKSPACE_ID): Set<string> {
+  const v = getVenture(ventureId, workspaceId);
   return new Set(v ? Object.values(v.areaAgents).flat() : []);
 }
 
-/** Which ventures an agent works for (shared infra agents serve all). */
-export function venturesForAgent(agentId: string): Venture[] {
-  return VENTURES.filter((v) => ventureAgentSet(v.id).has(agentId));
+/** Which ventures an agent works for (shared infra agents serve all), within one workspace. */
+export function venturesForAgent(agentId: string, workspaceId: WorkspaceId = DEFAULT_WORKSPACE_ID): Venture[] {
+  return getVentures(workspaceId).filter((v) => ventureAgentSet(v.id, workspaceId).has(agentId));
 }
 
 /** Agents on one life area for one venture. */
-export function ventureAreaAgents(ventureId: string, areaId: string): string[] {
-  return getVenture(ventureId)?.areaAgents[areaId] ?? [];
+export function ventureAreaAgents(ventureId: string, areaId: string, workspaceId: WorkspaceId = DEFAULT_WORKSPACE_ID): string[] {
+  return getVenture(ventureId, workspaceId)?.areaAgents[areaId] ?? [];
 }
 
-export function lifeAreaById(areaId: string): LifeArea | null {
-  return LIFE_AREAS.find((a) => a.id === areaId) ?? null;
+export function lifeAreaById(areaId: string, workspaceId: WorkspaceId = DEFAULT_WORKSPACE_ID): LifeArea | null {
+  return getLifeAreas(workspaceId).find((a) => a.id === areaId) ?? null;
 }

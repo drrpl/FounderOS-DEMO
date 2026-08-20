@@ -65,8 +65,18 @@ function HealthMeter({ value }: { value: number | null }) {
   );
 }
 
+/** This renders server-side on Railway (UTC), so the hour must be read in the
+ *  operator's timezone explicitly rather than via Date.getHours(), which
+ *  would use the server's local time instead. */
 function greeting(): string {
-  const hour = new Date().getHours();
+  const hour =
+    Number(
+      new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles',
+        hour: 'numeric',
+        hour12: false,
+      }).format(new Date()),
+    ) % 24;
   if (hour < 5) return 'Late night';
   if (hour < 12) return 'Good morning';
   if (hour < 18) return 'Good afternoon';

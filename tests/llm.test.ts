@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { z } from 'zod';
 import { chat, llmStatus } from '@/lib/connectors/llm';
 
-const KEY = 'AI_GATEWAY_API_KEY';
+const KEY = 'CLAUDE_CODE_OAUTH_TOKEN';
 const prevKey = process.env[KEY];
 const prevProvider = process.env.LLM_PROVIDER;
 
@@ -15,7 +15,7 @@ afterEach(() => {
 });
 
 describe('llmStatus — honest connector state', () => {
-  test('not_configured when no gateway key is present', async () => {
+  test('not_configured when no OAuth token is present', async () => {
     delete process.env[KEY];
     const status = await llmStatus();
     expect(status.state).toBe('not_configured');
@@ -23,8 +23,8 @@ describe('llmStatus — honest connector state', () => {
     expect(status.id).toBe('llm');
   });
 
-  test('connected when the gateway key is present', async () => {
-    process.env[KEY] = 'test-gateway-key';
+  test('connected when the OAuth token is present', async () => {
+    process.env[KEY] = 'sk-ant-oat01-test-token';
     const status = await llmStatus();
     expect(status.state).toBe('connected');
     expect(status.detail.length).toBeGreaterThan(0);

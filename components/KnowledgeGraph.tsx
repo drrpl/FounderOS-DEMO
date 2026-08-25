@@ -716,8 +716,16 @@ export function KnowledgeGraph({
       };
       sim.force('stage', stageForce);
     }
-    // resting targets already encode the rings, so radial only guards stragglers
-    (sim.force('radial') as any).strength((d: SimNode) => (tgt(d) || rest(d) ? 0 : 0.4));
+    // Radius is enforced INDEPENDENTLY of angular crowding: a strong radial pull
+    // (matched to the same spread/push scale the x-y targets use) keeps every
+    // ring-bound node at its exact ring radius no matter how densely packed its
+    // pillar's wedge is. Collide/charge crowding then resolves by sliding nodes
+    // ANGULARLY along the ring instead of bulging its radius outward — so the
+    // ring stays a true circle as agents/departments are added or removed,
+    // regardless of how unevenly they're distributed across pillars.
+    (sim.force('radial') as any)
+      .radius((d: SimNode) => RING_R[d.ring] * spread() * pushK(d))
+      .strength((d: SimNode) => (tgt(d) ? 0 : 0.55));
     // gentler focus expansion (+4 not +6) so entering a tree pops less abruptly;
     // condensed carousel sectors collapse to points — no collision fighting
     (sim.force('collide') as any).radius((d: SimNode) => (tgt(d) ? CAT[d.kind].r + 4 : focused() ? 0.5 : CAT[d.kind].r + 3));

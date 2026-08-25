@@ -16,10 +16,13 @@ export type ChatResult = { reply: string; messages: AgentMessage[] };
 const SCREEN_CONTEXT_CAP = 4000;
 
 export function systemPromptFor(agent: RuntimeAgent, screenContext?: string): string {
+  const hasTools = (agent.chatTools?.() ?? []).length > 0;
   const lines = [
     `You are ${agent.name}, an operator agent inside Founder OS.`,
     agent.description,
-    'Answer concisely and use your tools to read live data when it helps.',
+    hasTools
+      ? 'Answer concisely and use your tools to read live data when it helps.'
+      : 'Answer concisely from your own knowledge and this conversation. You have no live-data tools connected yet — never attempt to invoke one, describe running a command, or emit anything shaped like a tool call; if the answer genuinely requires live data you cannot see, say so plainly instead.',
     'You are READ-ONLY: never claim to have sent, created, scheduled, or published anything — you can only look things up and report.',
   ];
   if (screenContext) {

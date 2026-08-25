@@ -5,7 +5,7 @@
  * tools) and returns `{ routedTo, ...chat }`. Routing never throws on a bad
  * `@name` — it falls back to model routing.
  */
-import { chat as llmChat } from '@/lib/connectors/llm';
+import { chat as llmChat, CONDUCTOR_MODEL } from '@/lib/connectors/llm';
 import { chatWithAgent, type ChatResult } from '@/lib/agents/chat';
 import type { FounderDb } from '@/lib/db';
 import type { RuntimeAgent } from '@/lib/agents/runtime';
@@ -32,7 +32,10 @@ async function pickAgent(routable: RuntimeAgent[], message: string): Promise<str
     'Reply with ONLY that agent id and nothing else. Options:',
     roster,
   ].join('\n');
-  const res = await llmChat({ system, messages: [{ role: 'user', content: message }] });
+  // Routing is the Conductor's own judgment call — Opus 5, not the Sonnet 5
+  // department-head default (chat.ts's chatWithAgent, which handles the
+  // actual reply once routing has picked a target).
+  const res = await llmChat({ system, messages: [{ role: 'user', content: message }], model: CONDUCTOR_MODEL });
   const picked = (res.text.trim().split(/\s+/)[0] ?? '').replace(/[^a-zA-Z0-9_-]/g, '');
   const found = routable.find((a) => a.id === picked);
   return (found ?? routable[0]).id;

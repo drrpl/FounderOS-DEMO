@@ -1,11 +1,18 @@
 /**
- * LLM connector — backs agent & Conductor chat through the Vercel AI Gateway.
+ * LLM connector — backs agent & Conductor chat through the Claude Agent SDK,
+ * authenticated with CLAUDE_CODE_OAUTH_TOKEN (draws on the Claude subscription
+ * plan's usage, not metered per-token API billing). Two models: the Conductor's
+ * routing decision (pickAgent, in lib/agents/conductor.ts) uses Opus 5 — better
+ * judgment for picking the right agent; department-head/agent chat (chat.ts's
+ * chatWithAgent) uses Sonnet 5 — the workhorse model for actual replies. Each
+ * caller sets `model` on its LlmChatRequest; CONDUCTOR_MODEL / AGENT_MODEL are
+ * exported for that purpose.
  *
- * Mirrors the brain.ts provider shape: a real `gateway` provider (default) that
- * calls the AI SDK with a `"provider/model"` string, plus a `stub` provider
- * (LLM_PROVIDER=stub) that is deterministic and makes NO network call — so the
- * whole agent-chat stack is testable offline. Status stays honest: no
- * AI_GATEWAY_API_KEY ⇒ not_configured, never a fake "connected".
+ * Mirrors the previous provider shape: a real `claude-agent-sdk` provider
+ * (default) plus a `stub` provider (LLM_PROVIDER=stub) that is deterministic
+ * and makes NO subprocess call — so the whole agent-chat stack is testable
+ * offline. Status stays honest: no CLAUDE_CODE_OAUTH_TOKEN ⇒ not_configured,
+ * never a fake "connected".
  */
 import { z } from 'zod';
 import { CRED_FILES, resolveCred } from '@/lib/creds';
@@ -37,12 +44,16 @@ export interface LlmProvider {
   chat(req: LlmChatRequest): Promise<LlmChatResult>;
 }
 
-const GATEWAY_KEY = 'AI_GATEWAY_API_KEY';
-const DEFAULT_MODEL = process.env.LLM_MODEL ?? 'anthropic/claude-sonnet-5';
+const TOKEN_KEY = 'CLAUDE_CODE_OAUTH_TOKEN';
+
+/** Department-head/agent chat default. Override via LLM_MODEL. */
+export const AGENT_MODEL = process.env.LLM_MODEL ?? 'claude-sonnet-5';
+/** Conductor routing default (lib/agents/conductor.ts's pickAgent). Override via LLM_CONDUCTOR_MODEL. */
+export const CONDUCTOR_MODEL = process.env.LLM_CONDUCTOR_MODEL ?? 'claude-opus-5';
 
 /** process.env first (Next auto-loads .env.local), then Alex's cred files. */
-function resolveGatewayKey(): string | undefined {
-  return resolveCred(GATEWAY_KEY, [CRED_FILES.agentsEnv, CRED_FILES.socialMedia]);
+function resolveOAuthToken(): string | undefined {
+  return resolveCred(TOKEN_KEY, [CRED_FILES.agentsEnv, CRED_FILES.socialMedia]);
 }
 
 /** Stub trigger: a user message containing `use-tool:<name>` fires that tool. */
@@ -67,58 +78,110 @@ export const stubLlmProvider: LlmProvider = {
   },
 };
 
-export function createGatewayProvider(model: string = DEFAULT_MODEL): LlmProvider {
+/**
+ * Renders the rolling message history into one prompt string. The Agent SDK's
+ * query() takes a single prompt per turn, not a messages array — chat.ts owns
+ * real persistence and already resends the full history every call (same
+ * behavior the previous gateway provider had), so this is a faithful,
+ * non-regressive translation, not a new design.
+ */
+function renderPrompt(messages: LlmMessage[]): string {
+  return messages
+    .filter((m) => m.role !== 'system')
+    .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content}`)
+    .join('\n\n');
+}
+
+const MCP_SERVER_NAME = 'app';
+
+export function createClaudeAgentProvider(model: string): LlmProvider {
   return {
-    name: 'gateway',
+    name: 'claude-agent-sdk',
     async chat(req) {
       // Fail fast with an honest message instead of letting the SDK hang —
-      // and hydrate process.env from Alex's cred files so a key that
+      // and hydrate process.env from Alex's cred files so a token that
       // exists outside .env.local still works.
-      const key = resolveGatewayKey();
-      if (!key) {
-        throw new Error('AI_GATEWAY_API_KEY is not set — add it to .env.local to enable agent chat.');
+      const token = resolveOAuthToken();
+      if (!token) {
+        throw new Error(
+          'CLAUDE_CODE_OAUTH_TOKEN is not set — run `claude setup-token` and add the result to .env.local to enable agent chat.',
+        );
       }
-      if (!process.env.AI_GATEWAY_API_KEY) process.env.AI_GATEWAY_API_KEY = key;
-      const { generateText, tool, stepCountIs, gateway } = await import('ai');
-      const tools = Object.fromEntries(
-        (req.tools ?? []).map((t) => [
-          t.name,
-          tool({ description: t.description, inputSchema: t.parameters, execute: t.execute }),
-        ]),
-      );
-      const messages = req.messages
-        .filter((m) => m.role !== 'tool')
-        .map((m) => ({ role: m.role as 'system' | 'user' | 'assistant', content: m.content }));
+      if (!process.env.CLAUDE_CODE_OAUTH_TOKEN) process.env.CLAUDE_CODE_OAUTH_TOKEN = token;
 
-      const result = await generateText({
-        model: gateway(req.model ?? model),
-        system: req.system,
-        messages,
-        tools: req.tools?.length ? tools : undefined,
-        stopWhen: stepCountIs(6),
+      const { query, tool, createSdkMcpServer } = await import('@anthropic-ai/claude-agent-sdk');
+
+      const specs = req.tools ?? [];
+      const toolDefs = specs.map((t) => {
+        const shape =
+          t.parameters instanceof z.ZodObject ? (t.parameters as z.ZodObject<z.ZodRawShape>).shape : {};
+        return tool(t.name, t.description, shape, async (args) => {
+          const result = await t.execute(args as Record<string, unknown>);
+          return { content: [{ type: 'text' as const, text: JSON.stringify(result ?? null) }] };
+        });
       });
 
+      const mcpServers =
+        toolDefs.length > 0
+          ? { [MCP_SERVER_NAME]: createSdkMcpServer({ name: MCP_SERVER_NAME, tools: toolDefs }) }
+          : undefined;
+      const allowedTools = specs.map((t) => `mcp__${MCP_SERVER_NAME}__${t.name}`);
+
+      const toolUseById = new Map<string, { name: string; args: unknown }>();
       const toolCalls: LlmToolCall[] = [];
-      for (const step of result.steps ?? []) {
-        const calls = step.toolCalls ?? [];
-        const results = step.toolResults ?? [];
-        for (const c of calls) {
-          // Match the result to its call by id — a failed/missing tool result
-          // can leave `toolResults` shorter than `toolCalls`, so positional
-          // alignment would attach the wrong output to every later call.
-          const hit = results.find((r) => r.toolCallId === c.toolCallId);
-          toolCalls.push({ name: c.toolName, args: c.input, result: hit?.output });
+      let finalText = '';
+
+      const stream = query({
+        prompt: renderPrompt(req.messages),
+        options: {
+          model: req.model ?? model,
+          systemPrompt: req.system,
+          tools: [], // disable ALL built-in tools (Bash/Read/Write/Edit/...) — read-only web chat, only our own MCP tools
+          mcpServers,
+          allowedTools,
+          permissionMode: 'dontAsk',
+          cwd: process.cwd(),
+        },
+      });
+
+      for await (const message of stream) {
+        try {
+          if (message.type === 'assistant') {
+            for (const block of message.message.content ?? []) {
+              if (block.type === 'tool_use') {
+                toolUseById.set(block.id, { name: block.name, args: block.input });
+              }
+            }
+          } else if (message.type === 'user') {
+            const content = (message as { message?: { content?: unknown[] } }).message?.content ?? [];
+            for (const block of content) {
+              const b = block as { type?: string; tool_use_id?: string; content?: unknown };
+              if (b.type === 'tool_result' && b.tool_use_id) {
+                const use = toolUseById.get(b.tool_use_id);
+                if (use) toolCalls.push({ name: use.name, args: use.args, result: b.content });
+              }
+            }
+          } else if (message.type === 'result') {
+            finalText =
+              message.subtype === 'success'
+                ? message.result
+                : `Turn ended early (${message.subtype}).`;
+          }
+        } catch {
+          // Best-effort tool-call/result capture for the activity log — never
+          // let a shape surprise here break the actual chat reply above.
         }
       }
-      return { text: result.text, toolCalls };
+
+      return { text: finalText, toolCalls };
     },
   };
 }
 
 export function getLlmProvider(): LlmProvider {
-  const name = process.env.LLM_PROVIDER ?? 'gateway';
+  const name = process.env.LLM_PROVIDER ?? 'claude-agent-sdk';
   if (name === 'stub') return stubLlmProvider;
-  return createGatewayProvider();
+  return createClaudeAgentProvider(AGENT_MODEL);
 }
 
 export function chat(req: LlmChatRequest): Promise<LlmChatResult> {
@@ -126,17 +189,21 @@ export function chat(req: LlmChatRequest): Promise<LlmChatResult> {
 }
 
 export async function llmStatus(): Promise<ConnectorStatus> {
-  const base = { id: 'llm', name: 'LLM (Gateway)', kind: 'orchestration' } as const;
+  const base = { id: 'llm', name: 'LLM (Claude Agent SDK)', kind: 'orchestration' } as const;
   if (process.env.LLM_PROVIDER === 'stub') {
     return { ...base, state: 'connected', detail: 'stub provider active (tests)' };
   }
-  const key = resolveGatewayKey();
-  if (!key) {
+  const token = resolveOAuthToken();
+  if (!token) {
     return {
       ...base,
       state: 'not_configured',
-      detail: 'Set AI_GATEWAY_API_KEY in .env.local to enable agent chat via the Vercel AI Gateway.',
+      detail: 'Set CLAUDE_CODE_OAUTH_TOKEN in .env.local (run `claude setup-token`) to enable agent chat via your Claude subscription.',
     };
   }
-  return { ...base, state: 'connected', detail: `Vercel AI Gateway · default model ${DEFAULT_MODEL}` };
+  return {
+    ...base,
+    state: 'connected',
+    detail: `Claude Agent SDK (subscription) · agents: ${AGENT_MODEL} · conductor: ${CONDUCTOR_MODEL}`,
+  };
 }

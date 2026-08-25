@@ -31,7 +31,10 @@ export function ConductorChat({ agentNames }: { agentNames: Record<string, strin
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text }),
       });
-      if (!res.ok) throw new Error(`conductor failed (${res.status})`);
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? `conductor failed (${res.status})`);
+      }
       const body = (await res.json()) as { routedTo: string; reply: string };
       setTurns((t) => [...t, { id: `a-${t.length}`, role: 'assistant', content: body.reply, routedTo: body.routedTo }]);
     } catch (err) {

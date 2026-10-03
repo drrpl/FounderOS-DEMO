@@ -2,7 +2,7 @@ import { getDb } from '@/lib/data';
 import { PageHeader } from '@/components/PageHeader';
 import { SkillsGrid, type SkillCard } from '@/components/SkillsGrid';
 import { readPluginSkills, readUserSkills } from '@/lib/skills-catalog';
-import { readEncodedSkills } from '@/lib/encoded-skills';
+import { readEncodedSkills, withoutEncodedDuplicates } from '@/lib/encoded-skills';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,7 +38,7 @@ export default async function SkillsPage() {
 
   const db = getDb();
   const agentNames = Object.fromEntries(db.agents.all().map((a) => [a.id, a.name]));
-  const operatorCards: SkillCard[] = db.skills.all().map((s) => ({
+  const allOperatorCards: SkillCard[] = db.skills.all().map((s) => ({
     id: s.id,
     name: s.name,
     group: `Operator · ${s.category}`,
@@ -49,6 +49,8 @@ export default async function SkillsPage() {
     markdown: s.markdown,
   }));
 
+  // A live encoded skill replaces its seeded operator copy, so nothing shows twice.
+  const operatorCards = withoutEncodedDuplicates(allOperatorCards, encoded.skills.map((e) => e.name));
   const cards = [...encodedCards, ...realCards, ...operatorCards];
   const parts = [
     encoded.enabled

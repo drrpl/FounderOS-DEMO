@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { describeEncodedSkill, encodedSkillAgent, readEncodedSkills } from '@/lib/encoded-skills';
+import { describeEncodedSkill, encodedSkillAgent, readEncodedSkills, withoutEncodedDuplicates } from '@/lib/encoded-skills';
 
 const packSkill = `---
 name: lead-intake-run
@@ -68,5 +68,11 @@ describe('encoded skills', () => {
       company: 'Test Co',
     });
     expect(out.skills[0].markdown).toContain('Purpose');
+  });
+
+  it('hides seeded operator copies of live encoded skills', () => {
+    const operator = [{ id: 'skill-linkedin-post-draft' }, { id: 'skill-brand-voice-audit' }, { id: 'skill-other' }];
+    expect(withoutEncodedDuplicates(operator, ['linkedin-post-draft', 'brand-voice-audit']).map((c) => c.id)).toEqual(['skill-other']);
+    expect(withoutEncodedDuplicates(operator, [])).toHaveLength(3);
   });
 });

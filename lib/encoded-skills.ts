@@ -118,3 +118,13 @@ export async function readEncodedSkills(): Promise<{ skills: EncodedSkill[]; err
   cache = { at: Date.now(), key, skills, error };
   return { skills, error, enabled: true };
 }
+
+/**
+ * Seeded operator cards that copy a live encoded skill (ids are `skill-<name>`,
+ * e.g. `skill-linkedin-post-draft`) are hidden once the live version is listed,
+ * so each skill appears once.
+ */
+export function withoutEncodedDuplicates<T extends { id: string }>(operatorCards: T[], encodedNames: string[]): T[] {
+  const live = new Set(encodedNames.map((n) => n.toLowerCase()));
+  return operatorCards.filter((c) => !live.has(c.id.replace(/^skill-/, '').toLowerCase()));
+}
